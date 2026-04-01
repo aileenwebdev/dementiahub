@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import webhookRouter from "../webhooks";
+import { initSocketIO } from "../socket";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -35,6 +37,8 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  // Webhook routes (ElevenLabs post-call and consent)
+  app.use("/api/webhooks", webhookRouter);
   // tRPC API
   app.use(
     "/api/trpc",
@@ -56,6 +60,9 @@ async function startServer() {
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
+
+  // Initialize Socket.IO for real-time transcript streaming
+  initSocketIO(server);
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);

@@ -1,7 +1,18 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import {
+  callSessions,
+  callTranscripts,
+  failedSyncQueue,
+  InsertCallSession,
+  InsertCallTranscript,
+  InsertFailedSyncQueue,
+  InsertUser,
+  InsertUserIdentityMap,
+  userIdentityMap,
+  users,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -89,4 +100,164 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// ─── Identity Map Operations ─────────────────────────────────────────────────
+
+export async function getIdentityByUserId(portalUserId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(userIdentityMap)
+    .where(eq(userIdentityMap.portalUserId, portalUserId))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getIdentityByGhlContactId(ghlContactId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(userIdentityMap)
+    .where(eq(userIdentityMap.ghlContactId, ghlContactId))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function upsertIdentityMap(data: InsertUserIdentityMap): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const updateSet: Partial<InsertUserIdentityMap> = {};
+  if (data.ghlContactId !== undefined) updateSet.ghlContactId = data.ghlContactId;
+  if (data.ghlLocationId !== undefined) updateSet.ghlLocationId = data.ghlLocationId;
+  if (data.elevenlabsAgentId !== undefined) updateSet.elevenlabsAgentId = data.elevenlabsAgentId;
+  if (data.phoneNumber !== undefined) updateSet.phoneNumber = data.phoneNumber;
+  if (data.preferredLanguage !== undefined) updateSet.preferredLanguage = data.preferredLanguage;
+  if (data.consentGiven !== undefined) updateSet.consentGiven = data.consentGiven;
+  if (data.consentTimestamp !== undefined) updateSet.consentTimestamp = data.consentTimestamp;
+  await db.insert(userIdentityMap).values(data).onDuplicateKeyUpdate({ set: updateSet });
+}
+
+export async function updateConsentForContact(
+  ghlContactId: string,
+  consentTimestamp: Date
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(userIdentityMap)
+    .set({ consentGiven: true, consentTimestamp })
+    .where(eq(userIdentityMap.ghlContactId, ghlContactId));
+}
+
+// ─── Call Session Operations ──────────────────────────────────────────────────
+
+export async function createCallSession(data: InsertCallSession) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(callSessions).values(data);
+}
+
+export async function getCallSessionBySessionId(sessionId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(callSessions)
+    .where(eq(callSessions.sessionId, sessionId))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCallSessionByConversationId(conversationId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(callSessions)
+    .where(eq(callSessions.elevenlabsConversationId, conversationId))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCallSessionsByUserId(portalUserId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(callSessions)
+    .where(eq(callSessions.portalUserId, portalUserId))
+    .orderBy(desc(callSessions.createdAt))
+    .limit(limit);
+}
+
+export async function updateCallSession(
+  sessionId: string,
+  updates: Partial<InsertCallSession>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(callSessions).set(updates).where(eq(callSessions.sessionId, sessionId));
+}
+
+export async function updateCallSessionByConversationId(
+  conversationId: string,
+  updates: Partial<InsertCallSession>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(callSessions)
+    .set(updates)
+    .where(eq(callSessions.elevenlabsConversationId, conversationId));
+}
+
+// ─── Transcript Operations ────────────────────────────────────────────────────
+
+export async function insertTranscriptChunk(data: InsertCallTranscript): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(callTranscripts).values(data);
+}
+
+export async function getTranscriptsBySessionId(sessionId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(callTranscripts)
+    .where(eq(callTranscripts.sessionId, sessionId))
+    .orderBy(callTranscripts.timestamp);
+}
+
+// ─── Failed Sync Queue Operations ────────────────────────────────────────────
+
+export async function queueFailedSync(data: InsertFailedSyncQueue): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(failedSyncQueue).values(data);
+}
+
+export async function getPendingFailedSyncs(limit = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(failedSyncQueue)
+    .where(and(eq(failedSyncQueue.resolved, false)))
+    .orderBy(failedSyncQueue.createdAt)
+    .limit(limit);
+}
+
+export async function markSyncResolved(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(failedSyncQueue).set({ resolved: true }).where(eq(failedSyncQueue.id, id));
+}
