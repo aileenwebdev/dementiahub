@@ -148,6 +148,9 @@ export function ElevenLabsChatBox({
         }
 
         conversationRef.current = conversation;
+        if (session.contextualMemory) {
+          conversation.sendContextualUpdate(session.contextualMemory);
+        }
       } catch (err) {
         if (!cancelled) {
           setStatus("disconnected");

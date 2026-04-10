@@ -110,6 +110,48 @@ function toElevenLabsPromptContext(params: {
   ].join("\n");
 }
 
+function toElevenLabsContextualUpdate(params: {
+  user: {
+    id: number;
+    name: string | null;
+    email: string | null;
+    openId: string;
+  };
+  identity?: {
+    ghlContactId?: string | null;
+    ghlLocationId?: string | null;
+    phoneNumber?: string | null;
+    preferredLanguage?: string | null;
+    consentGiven?: boolean | null;
+  };
+  history: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
+}) {
+  const { user, identity, history } = params;
+  const historyBlock = history
+    .filter((message) => message.role !== "system")
+    .slice(-12)
+    .map((message) => `${message.role === "assistant" ? "Assistant" : "Caregiver"}: ${message.content}`)
+    .join("\n");
+
+  return [
+    "Use this caregiver profile as the source of truth for this portal session.",
+    `Portal user ID: ${user.id}`,
+    `Open ID: ${user.openId}`,
+    `Name: ${user.name ?? "Not provided"}`,
+    `Email: ${user.email ?? "Not provided"}`,
+    `Phone: ${identity?.phoneNumber ?? "Not provided"}`,
+    `Wibiz contact ID: ${identity?.ghlContactId ?? "Not linked"}`,
+    `Wibiz location ID: ${identity?.ghlLocationId ?? "Not linked"}`,
+    `Preferred language: ${identity?.preferredLanguage ?? "en"}`,
+    `Consent given: ${identity?.consentGiven ? "yes" : "no"}`,
+    "Continue naturally with the same caregiver and preserve continuity with this recent saved portal history when relevant.",
+    historyBlock || "No prior saved portal messages.",
+  ].join("\n");
+}
+
 async function ensureConversationForUser(portalUserId: number) {
   const existing = await getActiveAIChatConversationByUserId(portalUserId);
   if (existing) return existing;
@@ -173,21 +215,17 @@ export const aiRouter = router({
         wibiz_location_id: identity?.ghlLocationId ?? config.ghlLocationId,
         caregiver_language: identity?.preferredLanguage ?? "en",
       },
-      overrides: {
-        agent: {
-          prompt: {
-            prompt: toElevenLabsPromptContext({
-              user: {
-                id: ctx.user.id,
-                name: ctx.user.name,
-                email: ctx.user.email,
-                openId: ctx.user.openId,
-              },
-              identity,
-              history,
-            }),
-          },
+      contextualMemory: toElevenLabsContextualUpdate({
+        user: {
+          id: ctx.user.id,
+          name: ctx.user.name,
+          email: ctx.user.email,
+          openId: ctx.user.openId,
         },
+        identity,
+        history,
+      }),
+      overrides: {
         conversation: {
           textOnly: true,
         },
