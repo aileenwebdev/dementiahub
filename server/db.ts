@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   aiChatConversations,
@@ -330,4 +330,196 @@ export async function getAIChatMessagesByConversationId(conversationId: number, 
     .where(eq(aiChatMessages.conversationId, conversationId))
     .orderBy(aiChatMessages.createdAt)
     .limit(limit);
+}
+
+// Admin Operations
+
+export async function getAdminOverviewStats() {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalUsers: 0,
+      adminUsers: 0,
+      linkedUsers: 0,
+      consentedUsers: 0,
+      totalCalls: 0,
+      activeCalls: 0,
+      syncedCalls: 0,
+      aiConversations: 0,
+      pendingSyncs: 0,
+    };
+  }
+
+  const [
+    [userStats],
+    [identityStats],
+    [callStats],
+    [chatStats],
+    [syncStats],
+  ] = await Promise.all([
+    db
+      .select({
+        totalUsers: sql<number>`count(*)`,
+        adminUsers: sql<number>`sum(case when ${users.role} = 'admin' then 1 else 0 end)`,
+      })
+      .from(users),
+    db
+      .select({
+        linkedUsers: sql<number>`sum(case when ${userIdentityMap.ghlContactId} is not null then 1 else 0 end)`,
+        consentedUsers: sql<number>`sum(case when ${userIdentityMap.consentGiven} = true then 1 else 0 end)`,
+      })
+      .from(userIdentityMap),
+    db
+      .select({
+        totalCalls: sql<number>`count(*)`,
+        activeCalls: sql<number>`sum(case when ${callSessions.status} = 'active' then 1 else 0 end)`,
+        syncedCalls: sql<number>`sum(case when ${callSessions.ghlSynced} = true then 1 else 0 end)`,
+      })
+      .from(callSessions),
+    db
+      .select({
+        aiConversations: sql<number>`count(*)`,
+      })
+      .from(aiChatConversations),
+    db
+      .select({
+        pendingSyncs: sql<number>`sum(case when ${failedSyncQueue.resolved} = false then 1 else 0 end)`,
+      })
+      .from(failedSyncQueue),
+  ]);
+
+  return {
+    totalUsers: Number(userStats?.totalUsers ?? 0),
+    adminUsers: Number(userStats?.adminUsers ?? 0),
+    linkedUsers: Number(identityStats?.linkedUsers ?? 0),
+    consentedUsers: Number(identityStats?.consentedUsers ?? 0),
+    totalCalls: Number(callStats?.totalCalls ?? 0),
+    activeCalls: Number(callStats?.activeCalls ?? 0),
+    syncedCalls: Number(callStats?.syncedCalls ?? 0),
+    aiConversations: Number(chatStats?.aiConversations ?? 0),
+    pendingSyncs: Number(syncStats?.pendingSyncs ?? 0),
+  };
+}
+
+export async function getAdminUsers(params?: { search?: string; limit?: number }) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const limit = params?.limit ?? 50;
+  const search = params?.search?.trim();
+  const searchTerm = search ? `%${search}%` : undefined;
+
+  const query = db
+    .select({
+      user: users,
+      identity: userIdentityMap,
+    })
+    .from(users)
+    .leftJoin(userIdentityMap, eq(userIdentityMap.portalUserId, users.id))
+    .orderBy(desc(users.createdAt))
+    .limit(limit);
+
+  if (!searchTerm) {
+    return query;
+  }
+
+  return db
+    .select({
+      user: users,
+      identity: userIdentityMap,
+    })
+    .from(users)
+    .leftJoin(userIdentityMap, eq(userIdentityMap.portalUserId, users.id))
+    .where(
+      or(
+        like(users.name, searchTerm),
+        like(users.email, searchTerm),
+        like(users.openId, searchTerm),
+        like(userIdentityMap.phoneNumber, searchTerm),
+        like(userIdentityMap.ghlContactId, searchTerm)
+      )
+    )
+    .orderBy(desc(users.createdAt))
+    .limit(limit);
+}
+
+export async function getAdminUserDetail(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [userRow, calls, conversations] = await Promise.all([
+    db
+      .select({
+        user: users,
+        identity: userIdentityMap,
+      })
+      .from(users)
+      .leftJoin(userIdentityMap, eq(userIdentityMap.portalUserId, users.id))
+      .where(eq(users.id, userId))
+      .limit(1),
+    db
+      .select()
+      .from(callSessions)
+      .where(eq(callSessions.portalUserId, userId))
+      .orderBy(desc(callSessions.createdAt))
+      .limit(20),
+    db
+      .select()
+      .from(aiChatConversations)
+      .where(eq(aiChatConversations.portalUserId, userId))
+      .orderBy(desc(aiChatConversations.updatedAt))
+      .limit(10),
+  ]);
+
+  if (!userRow[0]) return null;
+
+  const conversationsWithMessages = await Promise.all(
+    conversations.map(async (conversation) => ({
+      conversation,
+      messages: await getAIChatMessagesByConversationId(conversation.id, 30),
+    }))
+  );
+
+  return {
+    user: userRow[0].user,
+    identity: userRow[0].identity,
+    calls,
+    conversations: conversationsWithMessages,
+  };
+}
+
+export async function getAdminRecentCallSessions(limit = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      call: callSessions,
+      user: users,
+    })
+    .from(callSessions)
+    .leftJoin(users, eq(users.id, callSessions.portalUserId))
+    .orderBy(desc(callSessions.createdAt))
+    .limit(limit);
+}
+
+export async function getAdminRecentAIConversations(limit = 20) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      conversation: aiChatConversations,
+      user: users,
+    })
+    .from(aiChatConversations)
+    .leftJoin(users, eq(users.id, aiChatConversations.portalUserId))
+    .orderBy(desc(aiChatConversations.updatedAt))
+    .limit(limit);
+
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      messages: await getAIChatMessagesByConversationId(row.conversation.id, 1),
+    }))
+  );
 }

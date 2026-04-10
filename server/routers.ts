@@ -7,6 +7,7 @@ import { ENV } from "./_core/env";
 import { hashPassword, sdk, verifyPassword } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminRouter } from "./routers/admin";
 import * as db from "./db";
 import { aiRouter } from "./routers/ai";
 import { callsRouter } from "./routers/calls";
@@ -110,6 +111,7 @@ export const appRouter = router({
   ai: aiRouter,
   identity: identityRouter,
   ghl: ghlRouter,
+  admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;

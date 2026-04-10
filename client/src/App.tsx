@@ -5,6 +5,8 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import AssistantPage from "./pages/AssistantPage";
+import AdminConversationsPage from "./pages/AdminConversationsPage";
+import AdminIntegrationPage from "./pages/AdminIntegrationPage";
 import Home from "./pages/Home";
 import CallPage from "./pages/CallPage";
 import CallHistoryPage from "./pages/CallHistoryPage";
@@ -20,6 +22,9 @@ function Router() {
       <Route path={"/login"} component={LoginPage} />
       <Route path={"/"} component={Home} />
       <Route path={"/assistant"} component={AssistantPage} />
+      <Route path={"/admin"} component={AdminConversationsPage} />
+      <Route path={"/admin/conversations"} component={AdminConversationsPage} />
+      <Route path={"/admin/integration"} component={AdminIntegrationPage} />
       <Route path={"/call"} component={CallPage} />
       <Route path={"/call/:sessionId"} component={CallDetailsPage} />
       <Route path={"/call/:sessionId/live"} component={LiveCallPage} />
