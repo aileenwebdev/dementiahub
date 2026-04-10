@@ -32,10 +32,13 @@ export function ElevenLabsChatBox({
 
   const conversationRef = useRef<TextConversation | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const appendPortalMessageRef = useRef<ReturnType<typeof trpc.ai.appendPortalMessage.useMutation> | null>(null);
   const appendPortalMessage = trpc.ai.appendPortalMessage.useMutation();
   const sessionQuery = trpc.ai.getElevenLabsSession.useQuery(undefined, {
     retry: 1,
   });
+
+  appendPortalMessageRef.current = appendPortalMessage;
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -139,7 +142,7 @@ export function ElevenLabsChatBox({
 
             setMessages((prev) => [...prev, nextMessage]);
             setStreamingReply("");
-            appendPortalMessage.mutate({
+            appendPortalMessageRef.current?.mutate({
               conversationId: session.conversationId,
               role: nextMessage.role,
               content: nextMessage.content,
@@ -190,7 +193,7 @@ export function ElevenLabsChatBox({
         void activeConversation.endSession();
       }
     };
-  }, [appendPortalMessage, sessionQuery.data, sessionQuery.error]);
+  }, [sessionQuery.data, sessionQuery.error]);
 
   const handleSend = () => {
     const trimmed = input.trim();
