@@ -68,6 +68,8 @@ export const appRouter = router({
         const user = await db.getUserByEmail(input.email);
         const invalid = !user || !user.passwordHash;
         const passwordOk = invalid ? false : await verifyPassword(input.password, user!.passwordHash!);
+        const isAdmin =
+          Boolean(ENV.adminEmail) && ENV.adminEmail.toLowerCase() === input.email.toLowerCase();
 
         if (!passwordOk) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
@@ -82,7 +84,11 @@ export const appRouter = router({
           maxAge: ONE_YEAR_MS,
         });
 
-        await db.upsertUser({ openId: user!.openId, lastSignedIn: new Date() });
+        await db.upsertUser({
+          openId: user!.openId,
+          lastSignedIn: new Date(),
+          role: isAdmin ? "admin" : user!.role,
+        });
         return { success: true } as const;
       }),
 
