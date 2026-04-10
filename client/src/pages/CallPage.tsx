@@ -7,7 +7,6 @@ import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
   CheckCircle2,
-  Globe,
   Loader2,
   Mic,
   Phone,
@@ -45,13 +44,13 @@ export default function CallPage() {
 
   const initiateWebCall = trpc.calls.initiateWebCall.useMutation({
     onSuccess: (data) => {
-      toast.success("Browser demo call ready", {
-        description: "Opening the live demo room now.",
+      toast.success("Browser voice call ready", {
+        description: "Opening the live ElevenLabs voice room now.",
       });
       setLocation(`/call/${data.sessionId}/live`);
     },
     onError: (err) => {
-      toast.error("Failed to start browser demo call", { description: err.message });
+      toast.error("Failed to start browser voice call", { description: err.message });
     },
   });
 
@@ -81,7 +80,7 @@ export default function CallPage() {
           <p className="cg-label">Call Assistant</p>
           <h1 className="cg-display mt-2 text-4xl font-bold text-[#0f2e2c] sm:text-5xl">Start a support call</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-            Use browser-based demo calling right away for presentations, or switch to live phone calling once the Wibiz and ElevenLabs telephony setup is fully enabled.
+            Launch the real ElevenLabs browser voice agent for demos and caregiver walkthroughs, or use live phone calling once outbound telephony is fully enabled.
           </p>
         </div>
 
@@ -89,25 +88,25 @@ export default function CallPage() {
           <Card className="cg-panel rounded-[2rem] border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
-                <Globe className="h-5 w-5 text-[#1d4e4b]" />
-                Browser demo call
+                <Mic className="h-5 w-5 text-[#1d4e4b]" />
+                Browser voice call
               </CardTitle>
               <CardDescription>
-                Best for demos today. Launch a guided web call room, walk through a scripted caregiver conversation, and save the outcome into portal history.
+                Best for demos and QA. Launch the actual ElevenLabs browser voice agent with the logged-in caregiver identity attached.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/70 p-4">
                 <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">What this does</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Creates a real saved session in the portal, opens a browser call experience, and stores the demo transcript, summary, and outcome in call history when you finish.
+                  Creates a real saved call session in the portal, opens the live ElevenLabs browser voice experience, and stores the transcript in call history when you finish.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary" className="rounded-full px-3 py-1">No telephony required</Badge>
+                <Badge variant="secondary" className="rounded-full px-3 py-1">Real ElevenLabs agent</Badge>
                 <Badge variant="secondary" className="rounded-full px-3 py-1">Saved to portal history</Badge>
-                <Badge variant="secondary" className="rounded-full px-3 py-1">Ready for demos</Badge>
+                <Badge variant="secondary" className="rounded-full px-3 py-1">Uses logged-in caregiver context</Badge>
               </div>
 
               <Button
@@ -118,12 +117,12 @@ export default function CallPage() {
                 {initiateWebCall.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Preparing browser call...
+                    Preparing browser voice call...
                   </>
                 ) : (
                   <>
                     <Mic className="mr-2 h-4 w-4" />
-                    Start Browser Demo Call
+                    Start Browser Voice Call
                   </>
                 )}
               </Button>
@@ -154,7 +153,7 @@ export default function CallPage() {
                       )}
                       {!setupStatus.elevenLabsConfigured && (
                         <p className="text-xs text-amber-700">
-                          ElevenLabs calling is not configured yet. Use the browser demo call for now.
+                          ElevenLabs calling is not configured yet. Use the browser voice call for now.
                         </p>
                       )}
                     </div>
@@ -247,7 +246,7 @@ export default function CallPage() {
         <Card className="border-dashed bg-muted/30">
           <CardContent className="py-4">
             <p className="text-xs leading-relaxed text-muted-foreground">
-              <strong className="text-foreground">Demo mode recommendation:</strong> for presentations, use the browser demo call. It keeps the portal experience complete while outbound telephony is still being finalized. When phone calling is ready, live call outcomes will continue syncing against the same Wibiz-linked caregiver record.
+              <strong className="text-foreground">Recommendation:</strong> use the browser voice call for demos and QA. It runs the actual ElevenLabs agent in-browser while keeping the session attached to the same Wibiz-linked caregiver record.
             </p>
           </CardContent>
         </Card>

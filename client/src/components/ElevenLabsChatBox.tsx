@@ -36,6 +36,7 @@ export function ElevenLabsChatBox({
   const startedSessionRef = useRef<string | null>(null);
   const seenMessageEventsRef = useRef<Set<string>>(new Set());
   const hasSeededInitialMessagesRef = useRef(false);
+  const pendingUserMessagesRef = useRef<string[]>([]);
   const appendPortalMessage = trpc.ai.appendPortalMessage.useMutation();
   const sessionQuery = trpc.ai.getElevenLabsSession.useQuery(undefined, {
     retry: 1,
@@ -163,6 +164,16 @@ export function ElevenLabsChatBox({
               content: message,
             };
 
+            if (nextMessage.role === "user") {
+              const pendingIndex = pendingUserMessagesRef.current.findIndex(
+                (value) => value === nextMessage.content
+              );
+              if (pendingIndex >= 0) {
+                pendingUserMessagesRef.current.splice(pendingIndex, 1);
+                return;
+              }
+            }
+
             setMessages((prev) => [...prev, nextMessage]);
             setStreamingReply("");
             appendPortalMessageRef.current?.mutate({
@@ -216,6 +227,7 @@ export function ElevenLabsChatBox({
       conversationRef.current = null;
       startedSessionRef.current = null;
       seenMessageEventsRef.current.clear();
+      pendingUserMessagesRef.current = [];
       if (activeConversation) {
         void activeConversation.endSession();
       }
@@ -228,6 +240,13 @@ export function ElevenLabsChatBox({
       return;
     }
 
+    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+    pendingUserMessagesRef.current.push(trimmed);
+    appendPortalMessageRef.current?.mutate({
+      conversationId: sessionQuery.data?.conversationId,
+      role: "user",
+      content: trimmed,
+    });
     conversationRef.current.sendUserMessage(trimmed);
     setInput("");
   };
@@ -237,6 +256,7 @@ export function ElevenLabsChatBox({
     conversationRef.current = null;
     startedSessionRef.current = null;
     seenMessageEventsRef.current.clear();
+    pendingUserMessagesRef.current = [];
     if (activeConversation) {
       await activeConversation.endSession();
     }

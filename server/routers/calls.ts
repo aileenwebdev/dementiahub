@@ -14,8 +14,41 @@ import {
 import {
   getAllConversations,
   getConversation,
+  getSignedConversationUrl,
   initiateOutboundCall,
 } from "../services/elevenlabs";
+
+function toBrowserCallContext(params: {
+  user: {
+    id: number;
+    name: string | null;
+    email: string | null;
+    openId: string;
+  };
+  identity?: {
+    ghlContactId?: string | null;
+    ghlLocationId?: string | null;
+    phoneNumber?: string | null;
+    preferredLanguage?: string | null;
+    consentGiven?: boolean | null;
+  };
+}) {
+  const { user, identity } = params;
+  return [
+    "You are the live DementiaHub caregiver voice assistant inside the portal.",
+    "Use the logged-in caregiver profile below as the source of truth.",
+    `Portal user ID: ${user.id}`,
+    `Open ID: ${user.openId}`,
+    `Name: ${user.name ?? "Not provided"}`,
+    `Email: ${user.email ?? "Not provided"}`,
+    `Phone: ${identity?.phoneNumber ?? "Not provided"}`,
+    `Wibiz contact ID: ${identity?.ghlContactId ?? "Not linked"}`,
+    `Wibiz location ID: ${identity?.ghlLocationId ?? "Not linked"}`,
+    `Preferred language: ${identity?.preferredLanguage ?? "en"}`,
+    `Consent given: ${identity?.consentGiven ? "yes" : "no"}`,
+    "Recognize this same logged-in caregiver throughout the conversation.",
+  ].join("\n");
+}
 
 export const callsRouter = router({
   /**
@@ -90,34 +123,131 @@ export const callsRouter = router({
       };
     }),
 
-  /**
-   * Initiate a browser-based demo call that still creates a real saved session.
-   */
   initiateWebCall: protectedProcedure.mutation(async ({ ctx }) => {
     const userId = ctx.user.id;
     const identity = await getIdentityByUserId(userId);
     const sessionId = `web_${Date.now()}_${userId}`;
-    const conversationId = `web_demo_${Date.now()}_${userId}`;
 
     await createCallSession({
       sessionId,
       portalUserId: userId,
       ghlContactId: identity?.ghlContactId,
       ghlLocationId: identity?.ghlLocationId ?? config.ghlLocationId,
-      elevenlabsConversationId: conversationId,
-      elevenlabsAgentId: config.elevenLabsAgentId || "web-demo",
+      elevenlabsAgentId: config.elevenLabsAgentId || "browser-call",
       status: "active",
       callStartTime: new Date(),
     });
 
     return {
       sessionId,
-      conversationId,
       status: "active",
-      mode: "web_demo" as const,
-      message: "Browser demo call ready",
+      mode: "browser_voice" as const,
+      message: "Browser voice call ready",
     };
   }),
+
+  getBrowserCallSession: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const session = await getCallSessionBySessionId(input.sessionId);
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
+      }
+      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      if (!config.elevenLabsApiKey || !config.elevenLabsAgentId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "ElevenLabs browser calling is not configured.",
+        });
+      }
+
+      const identity = await getIdentityByUserId(ctx.user.id);
+      const signedUrl = await getSignedConversationUrl(
+        config.elevenLabsApiKey,
+        config.elevenLabsAgentId
+      );
+
+      return {
+        signedUrl,
+        agentId: config.elevenLabsAgentId,
+        dynamicVariables: {
+          caregiver_name: ctx.user.name ?? "Caregiver",
+          caregiver_email: ctx.user.email ?? "",
+          portal_user_id: String(ctx.user.id),
+          portal_open_id: ctx.user.openId,
+          wibiz_contact_id: identity?.ghlContactId ?? "",
+          wibiz_location_id: identity?.ghlLocationId ?? config.ghlLocationId,
+          caregiver_language: identity?.preferredLanguage ?? "en",
+          portal_call_session_id: input.sessionId,
+        },
+        contextualMemory: toBrowserCallContext({
+          user: {
+            id: ctx.user.id,
+            name: ctx.user.name,
+            email: ctx.user.email,
+            openId: ctx.user.openId,
+          },
+          identity,
+        }),
+      };
+    }),
+
+  bindBrowserConversation: protectedProcedure
+    .input(z.object({ sessionId: z.string(), conversationId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await getCallSessionBySessionId(input.sessionId);
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
+      }
+      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+
+      await updateCallSession(input.sessionId, {
+        elevenlabsConversationId: input.conversationId,
+        elevenlabsAgentId: config.elevenLabsAgentId || session.elevenlabsAgentId,
+      });
+
+      return { success: true } as const;
+    }),
+
+  appendBrowserTranscriptChunk: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        conversationId: z.string().optional(),
+        speaker: z.enum(["agent", "user"]),
+        text: z.string().min(1),
+        timestamp: z.number(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const session = await getCallSessionBySessionId(input.sessionId);
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
+      }
+      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+
+      await insertTranscriptChunk({
+        sessionId: input.sessionId,
+        elevenlabsConversationId: input.conversationId ?? session.elevenlabsConversationId,
+        speaker: input.speaker,
+        text: input.text.trim(),
+        timestamp: new Date(input.timestamp),
+      });
+
+      if (input.conversationId && !session.elevenlabsConversationId) {
+        await updateCallSession(input.sessionId, {
+          elevenlabsConversationId: input.conversationId,
+        });
+      }
+
+      return { success: true } as const;
+    }),
 
   /**
    * Get call history for the current user.
@@ -274,6 +404,39 @@ export const callsRouter = router({
         consentTimestamp: input.consentVerballyConfirmed ? new Date(endedAt) : null,
         escalationTriggered: input.safetyResult === "UNSAFE",
         transcriptRaw,
+      });
+
+      return { success: true } as const;
+    }),
+
+  completeBrowserVoiceCall: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await getCallSessionBySessionId(input.sessionId);
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
+      }
+      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+
+      const transcriptChunks = await getTranscriptsBySessionId(input.sessionId);
+      const transcriptRaw = transcriptChunks
+        .map((chunk) => `[${chunk.speaker.toUpperCase()}]: ${chunk.text}`)
+        .join("\n");
+      const endTime = new Date();
+      const startedAt = session.callStartTime ? new Date(session.callStartTime).getTime() : Date.now();
+      const durationSeconds = Math.max(1, Math.round((endTime.getTime() - startedAt) / 1000));
+
+      await updateCallSession(input.sessionId, {
+        status: "completed",
+        callEndTime: endTime,
+        callDurationSeconds: durationSeconds,
+        transcriptRaw,
+        callSummary: transcriptChunks.length
+          ? "Browser voice conversation completed and saved to portal history."
+          : "Browser voice conversation ended with no transcript captured.",
+        resolutionType: "browser_voice_demo",
       });
 
       return { success: true } as const;
