@@ -1,33 +1,13 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { AIChatBox, type Message } from "@/components/AIChatBox";
+import { ElevenLabsChatBox } from "@/components/ElevenLabsChatBox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Brain, Link2, MessagesSquare, UserRound } from "lucide-react";
 
 export default function AssistantPage() {
-  const utils = trpc.useUtils();
   const { data, isLoading } = trpc.ai.getMyConversation.useQuery();
   const { data: identity } = trpc.identity.getMyIdentity.useQuery();
-
-  const chatMutation = trpc.ai.chat.useMutation({
-    onSuccess: async () => {
-      await utils.ai.getMyConversation.invalidate();
-    },
-  });
-
-  const messages: Message[] =
-    data?.messages.map((message) => ({
-      role: message.role,
-      content: message.content,
-    })) ?? [];
-
-  const handleSendMessage = (content: string) => {
-    chatMutation.mutate({
-      content,
-      conversationId: data?.conversation.id,
-    });
-  };
 
   const sidebar = (
     <div className="cg-sidebar-card sticky top-[104px] rounded-[1.6rem] p-6">
@@ -83,12 +63,12 @@ export default function AssistantPage() {
                 One caregiver, one continuous conversation.
               </h1>
               <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">
-                This assistant is now anchored to the authenticated portal user, so replies can stay personal and your message history remains inside the caregiver portal.
+                This assistant now connects to your live ElevenLabs chat agent while staying anchored to the authenticated portal user, so the experience sounds natural and your saved history remains inside the caregiver portal.
               </p>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[#7a9e8a]/22 bg-[#7a9e8a]/10 px-4 py-2 text-sm font-medium text-[#527a68]">
               <span className="h-2 w-2 rounded-full bg-[#7a9e8a]" />
-              Persistent chat enabled
+              ElevenLabs live chat enabled
             </div>
           </div>
         </section>
@@ -98,12 +78,12 @@ export default function AssistantPage() {
             {
               icon: UserRound,
               title: "Recognized identity",
-              text: "The assistant receives the logged-in caregiver profile before every reply.",
+              text: "The ElevenLabs agent receives the logged-in caregiver profile before every session starts.",
             },
             {
               icon: MessagesSquare,
               title: "Saved history",
-              text: "User and assistant messages are stored in the portal and reloaded on return.",
+              text: "User and assistant messages are mirrored into the portal and reloaded on return.",
             },
             {
               icon: Link2,
@@ -125,25 +105,24 @@ export default function AssistantPage() {
           <CardHeader className="border-b border-[#ddd3c4] bg-white/35 px-6 py-5">
             <CardTitle className="flex items-center gap-2 text-xl text-[#0f2e2c]">
               <Brain className="h-5 w-5 text-[#1d4e4b]" />
-              Caregiver AI Assistant
+              ElevenLabs Caregiver Assistant
             </CardTitle>
             <CardDescription>
-              Ask questions here and the portal will keep the caregiver&apos;s conversation history attached to their account.
+              This portal chat now uses the live ElevenLabs agent, while Wibiz remains the backend system of record for caregiver identity, cases, and automation.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <AIChatBox
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              isLoading={isLoading || chatMutation.isPending}
+            <ElevenLabsChatBox
+              initialMessages={
+                data?.messages
+                  .filter((message) => message.role !== "system")
+                  .map((message) => ({
+                    role: message.role as "user" | "assistant",
+                    content: message.content,
+                  })) ?? []
+              }
               height="70vh"
               className="rounded-none border-0 bg-transparent shadow-none"
-              emptyStateMessage="Start a caregiver support conversation"
-              suggestedPrompts={[
-                "Who am I in this portal session?",
-                "Summarize what you know about my caregiver profile.",
-                "Help me prepare a caregiver update for today.",
-              ]}
             />
           </CardContent>
         </Card>

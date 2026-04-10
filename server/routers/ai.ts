@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { invokeLLM, type Message } from "../_core/llm";
+import { config } from "../config";
 import {
   createAIChatConversation,
   createAIChatMessage,
@@ -11,6 +12,7 @@ import {
   touchAIChatConversation,
 } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
+import { getSignedConversationUrl } from "../services/elevenlabs";
 
 const CAREGIVER_SYSTEM_PROMPT = `You are DementiaHub's caregiver support assistant inside the caregiver portal.
 
@@ -57,6 +59,57 @@ function toChatPromptContext(params: {
   ].join("\n");
 }
 
+function toElevenLabsPromptContext(params: {
+  user: {
+    id: number;
+    name: string | null;
+    email: string | null;
+    openId: string;
+  };
+  identity?: {
+    ghlContactId?: string | null;
+    ghlLocationId?: string | null;
+    phoneNumber?: string | null;
+    preferredLanguage?: string | null;
+    consentGiven?: boolean | null;
+  };
+  history: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
+}) {
+  const { user, identity, history } = params;
+  const historyBlock = history
+    .filter((message) => message.role !== "system")
+    .slice(-16)
+    .map((message) => `[${message.role.toUpperCase()}] ${message.content}`)
+    .join("\n");
+
+  return [
+    CAREGIVER_SYSTEM_PROMPT.trim(),
+    "",
+    "You are running as the live ElevenLabs caregiver assistant inside the Dementia Singapore portal.",
+    "Use the caregiver profile below as the source of truth for identity and continuity.",
+    "Do not invent a new user or account.",
+    "",
+    "Current caregiver profile:",
+    `- portalUserId: ${user.id}`,
+    `- openId: ${user.openId}`,
+    `- name: ${user.name ?? "Not provided"}`,
+    `- email: ${user.email ?? "Not provided"}`,
+    `- phoneNumber: ${identity?.phoneNumber ?? "Not provided"}`,
+    `- wibizContactId: ${identity?.ghlContactId ?? "Not linked"}`,
+    `- wibizLocationId: ${identity?.ghlLocationId ?? "Not linked"}`,
+    `- preferredLanguage: ${identity?.preferredLanguage ?? "en"}`,
+    `- consentGiven: ${identity?.consentGiven ? "yes" : "no"}`,
+    "",
+    "Recent saved portal conversation history:",
+    historyBlock || "No prior messages saved.",
+    "",
+    "Continue naturally from this caregiver's prior portal conversation when relevant.",
+  ].join("\n");
+}
+
 async function ensureConversationForUser(portalUserId: number) {
   const existing = await getActiveAIChatConversationByUserId(portalUserId);
   if (existing) return existing;
@@ -90,6 +143,85 @@ export const aiRouter = router({
       messages,
     };
   }),
+
+  getElevenLabsSession: protectedProcedure.query(async ({ ctx }) => {
+    if (!config.elevenLabsApiKey || !config.elevenLabsAgentId) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "ElevenLabs chat is not configured.",
+      });
+    }
+
+    const conversation = await ensureConversationForUser(ctx.user.id);
+    const identity = await getIdentityByUserId(ctx.user.id);
+    const history = await getAIChatMessagesByConversationId(conversation.id, 50);
+    const signedUrl = await getSignedConversationUrl(
+      config.elevenLabsApiKey,
+      config.elevenLabsAgentId
+    );
+
+    return {
+      conversationId: conversation.id,
+      agentId: config.elevenLabsAgentId,
+      signedUrl,
+      dynamicVariables: {
+        caregiver_name: ctx.user.name ?? "Caregiver",
+        caregiver_email: ctx.user.email ?? "",
+        portal_user_id: String(ctx.user.id),
+        portal_open_id: ctx.user.openId,
+        wibiz_contact_id: identity?.ghlContactId ?? "",
+        wibiz_location_id: identity?.ghlLocationId ?? config.ghlLocationId,
+        caregiver_language: identity?.preferredLanguage ?? "en",
+      },
+      overrides: {
+        agent: {
+          prompt: {
+            prompt: toElevenLabsPromptContext({
+              user: {
+                id: ctx.user.id,
+                name: ctx.user.name,
+                email: ctx.user.email,
+                openId: ctx.user.openId,
+              },
+              identity,
+              history,
+            }),
+          },
+        },
+        conversation: {
+          textOnly: true,
+        },
+      },
+    };
+  }),
+
+  appendPortalMessage: protectedProcedure
+    .input(
+      z.object({
+        conversationId: z.number().int().positive().optional(),
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(8000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = input.conversationId
+        ? await getAIChatConversationById(input.conversationId)
+        : await ensureConversationForUser(ctx.user.id);
+
+      if (!conversation || conversation.portalUserId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Conversation not found for current user" });
+      }
+
+      await createAIChatMessage({
+        conversationId: conversation.id,
+        portalUserId: ctx.user.id,
+        role: input.role,
+        content: input.content.trim(),
+      });
+      await touchAIChatConversation(conversation.id);
+
+      return { success: true, conversationId: conversation.id } as const;
+    }),
 
   chat: protectedProcedure
     .input(

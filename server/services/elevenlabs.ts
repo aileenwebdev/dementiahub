@@ -119,6 +119,32 @@ export async function initiateOutboundCall(
   return res.json();
 }
 
+export async function getSignedConversationUrl(
+  apiKey: string,
+  agentId: string
+): Promise<string> {
+  const res = await fetch(
+    `${ELEVENLABS_BASE_URL}/v1/convai/conversation/get-signed-url?agent_id=${agentId}`,
+    {
+      headers: {
+        "xi-api-key": apiKey,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`ElevenLabs getSignedConversationUrl failed: ${res.status} ${err}`);
+  }
+
+  const data = await res.json();
+  if (!data?.signed_url) {
+    throw new Error("ElevenLabs did not return a signed URL");
+  }
+
+  return data.signed_url;
+}
+
 // ─── Transcript Helpers ──────────────────────────────────────────────────────
 
 export function formatTranscriptToText(
