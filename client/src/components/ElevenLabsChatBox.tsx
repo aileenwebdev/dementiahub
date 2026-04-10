@@ -74,18 +74,23 @@ export function ElevenLabsChatBox({
     }
 
     let cancelled = false;
+    let connectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const startSession = async () => {
       try {
         setIsBooting(true);
         setError(null);
+        connectionTimeout = setTimeout(() => {
+          if (!cancelled && !conversationRef.current) {
+            setIsBooting(false);
+            setStatus("disconnected");
+            setError("ElevenLabs session timed out before connecting. Please try reconnecting.");
+          }
+        }, 15000);
 
         const conversation = await Conversation.startSession({
           signedUrl: session.signedUrl,
           textOnly: true,
-          dynamicVariables: session.dynamicVariables,
-          overrides: session.overrides,
-          userId: String(session.conversationId),
           onStatusChange: ({ status: nextStatus }) => {
             if (!cancelled) {
               setStatus(nextStatus);
@@ -147,11 +152,20 @@ export function ElevenLabsChatBox({
           return;
         }
 
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout);
+          connectionTimeout = null;
+        }
+
         conversationRef.current = conversation;
         if (session.contextualMemory) {
           conversation.sendContextualUpdate(session.contextualMemory);
         }
       } catch (err) {
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout);
+          connectionTimeout = null;
+        }
         if (!cancelled) {
           setStatus("disconnected");
           setError(err instanceof Error ? err.message : "Failed to start ElevenLabs chat");
@@ -167,6 +181,9 @@ export function ElevenLabsChatBox({
 
     return () => {
       cancelled = true;
+      if (connectionTimeout) {
+        clearTimeout(connectionTimeout);
+      }
       const activeConversation = conversationRef.current;
       conversationRef.current = null;
       if (activeConversation) {
