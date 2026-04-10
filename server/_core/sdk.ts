@@ -1,7 +1,7 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import { parse as parseCookieHeader } from "cookie";
-import { randomBytes, scrypt, timingSafeEqual } from "crypto";
+import { randomBytes, scrypt, timingSafeEqual, webcrypto } from "crypto";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import { promisify } from "util";
@@ -10,6 +10,13 @@ import * as db from "../db";
 import { ENV } from "./env";
 
 const scryptAsync = promisify(scrypt);
+
+if (!globalThis.crypto) {
+  Object.defineProperty(globalThis, "crypto", {
+    value: webcrypto,
+    configurable: true,
+  });
+}
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
