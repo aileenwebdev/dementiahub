@@ -79,7 +79,7 @@ export default function CallHistoryPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Call History</h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              All your voice AI sessions and their outcomes
+              All your browser demo and phone assistant sessions in one place
             </p>
           </div>
           <Button onClick={() => setLocation("/call")} className="gap-2">
@@ -96,7 +96,7 @@ export default function CallHistoryPage() {
               { label: "Safe", value: stats.safe, icon: Shield, color: "text-emerald-600" },
               { label: "Caution", value: stats.caution, icon: Clock, color: "text-amber-600" },
               { label: "Unsafe", value: stats.unsafe, icon: XCircle, color: "text-red-600" },
-              { label: "GHL Synced", value: stats.synced, icon: CheckCircle2, color: "text-emerald-600" },
+              { label: "Wibiz Synced", value: stats.synced, icon: CheckCircle2, color: "text-emerald-600" },
             ].map((s) => (
               <Card key={s.label}>
                 <CardContent className="pt-4 pb-3">
@@ -171,7 +171,7 @@ export default function CallHistoryPage() {
                 <PhoneCall className="h-10 w-10 text-muted-foreground/40 mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">No calls found</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {callHistory?.length === 0 ? "Start your first call to see it here" : "Try adjusting your filters"}
+                  {callHistory?.length === 0 ? "Start your first browser or phone call to see it here" : "Try adjusting your filters"}
                 </p>
               </div>
             ) : (
@@ -184,7 +184,7 @@ export default function CallHistoryPage() {
                       <TableHead>Safety</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Duration</TableHead>
-                      <TableHead>GHL Sync</TableHead>
+                      <TableHead>Wibiz Sync</TableHead>
                       <TableHead className="w-[80px]"></TableHead>
                     </TableRow>
                   </TableHeader>

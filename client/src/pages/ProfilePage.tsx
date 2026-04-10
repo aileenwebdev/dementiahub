@@ -32,12 +32,12 @@ export default function ProfilePage() {
 
   const syncGHL = trpc.identity.setupIdentity.useMutation({
     onSuccess: (result) => {
-      toast.success(result.ghlContactId ? "GHL contact synced successfully" : "Profile synced");
+      toast.success(result.ghlContactId ? "Wibiz contact synced successfully" : "Profile synced");
       refetchIdentity();
       refetchSetup();
     },
     onError: (err: { message: string }) => {
-      toast.error("GHL sync failed", { description: err.message });
+      toast.error("Wibiz sync failed", { description: err.message });
     },
   });
 
@@ -59,7 +59,7 @@ export default function ProfilePage() {
         {[
           { label: "Account created", done: true },
           { label: "Phone number saved", done: setupStatus?.hasPhone ?? false },
-          { label: "GHL contact linked", done: setupStatus?.hasGHLContact ?? false },
+          { label: "Wibiz contact linked", done: setupStatus?.hasGHLContact ?? false },
           { label: "ElevenLabs configured", done: setupStatus?.elevenLabsConfigured ?? false },
           { label: "Consent verified", done: setupStatus?.consentGiven ?? false },
         ].map((item) => (
@@ -150,7 +150,7 @@ export default function ProfilePage() {
                   Save
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground">Include the country code so GHL and voice workflows can match correctly.</p>
+              <p className="text-sm text-muted-foreground">Include the country code so Wibiz and voice workflows can match correctly.</p>
             </div>
           </CardContent>
         </Card>
@@ -159,10 +159,10 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-[#0f2e2c]">
               <ExternalLink className="h-5 w-5 text-[#1d4e4b]" />
-              GHL Contact
+              Wibiz Contact
             </CardTitle>
             <CardDescription>
-              Your caregiver portal account links to a GHL contact so conversations and care workflows stay mapped correctly.
+              Your caregiver portal account links to a Wibiz contact so conversations and care workflows stay mapped correctly.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -171,7 +171,7 @@ export default function ProfilePage() {
                 <div className="rounded-[1.3rem] bg-white/65 p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    <span className="font-medium text-emerald-700">GHL contact linked</span>
+                    <span className="font-medium text-emerald-700">Wibiz contact linked</span>
                   </div>
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
                     <span className="text-muted-foreground">Contact ID</span>
@@ -191,7 +191,7 @@ export default function ProfilePage() {
                   className="rounded-2xl border-[#ddd3c4] bg-white/65 hover:bg-white"
                 >
                   {syncGHL.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  Re-sync with GHL
+                  Re-sync with Wibiz
                 </Button>
               </>
             ) : (
@@ -199,7 +199,7 @@ export default function ProfilePage() {
                 <div className="rounded-[1.3rem] border border-[#d4935a]/22 bg-[#d4935a]/10 p-4">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-4 w-4 text-[#b77642]" />
-                    <span className="font-medium text-[#84532d]">No GHL contact linked yet</span>
+                    <span className="font-medium text-[#84532d]">No Wibiz contact linked yet</span>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-[#84532d]">
                     Save a phone number first, then create or re-sync the caregiver contact so future AI and call activity maps back to this same account.
@@ -211,7 +211,7 @@ export default function ProfilePage() {
                   className="rounded-2xl bg-[#1d4e4b] hover:bg-[#0f2e2c]"
                 >
                   {syncGHL.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
-                  Create GHL Contact
+                  Create Wibiz Contact
                 </Button>
               </>
             )}

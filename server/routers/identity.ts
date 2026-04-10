@@ -49,8 +49,8 @@ export const identityRouter = router({
         success: true,
         ghlContactId,
         message: ghlContactId
-          ? "Identity linked to GHL contact successfully"
-          : "Identity saved (GHL contact creation pending)",
+          ? "Identity linked to Wibiz contact successfully"
+          : "Identity saved (Wibiz contact creation pending)",
       };
     }),
 

@@ -73,7 +73,7 @@ export default function AdminConversationsPage() {
           <ShieldAlert className="mx-auto h-12 w-12 text-[#b77642]" />
           <h1 className="cg-display mt-4 text-3xl font-bold text-[#0f2e2c]">Admin access required</h1>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            This panel is only available to DementiaHub administrators. We can promote an account to admin and wire the final GHL and ElevenLabs credentials when you share them.
+            This panel is only available to DementiaHub administrators. We can promote an account to admin and wire the final Wibiz and ElevenLabs credentials when you share them.
           </p>
           <Button onClick={() => setLocation("/")} className="mt-6 rounded-full bg-[#1d4e4b] hover:bg-[#0f2e2c]">
             Return to dashboard
@@ -94,7 +94,7 @@ export default function AdminConversationsPage() {
                 Caregiver records and conversations
               </h1>
               <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">
-                Review caregiver accounts, inspect identity linkage to GHL, and follow how portal chats and calls are being recorded before the full production rollout.
+                Review caregiver accounts, inspect identity linkage to Wibiz, and follow how portal chats and calls are being recorded before the full production rollout.
               </p>
             </div>
 
@@ -123,7 +123,7 @@ export default function AdminConversationsPage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {[
               { label: "Caregivers", value: stats.totalUsers, icon: Users, tone: "bg-[#1d4e4b]/10 text-[#1d4e4b]" },
-              { label: "Linked to GHL", value: stats.linkedUsers, icon: Link2, tone: "bg-[#7a9e8a]/14 text-[#527a68]" },
+              { label: "Linked to Wibiz", value: stats.linkedUsers, icon: Link2, tone: "bg-[#7a9e8a]/14 text-[#527a68]" },
               { label: "Consent Verified", value: stats.consentedUsers, icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-700" },
               { label: "Voice Calls", value: stats.totalCalls, icon: Clock3, tone: "bg-[#d4935a]/14 text-[#b77642]" },
               { label: "AI Threads", value: stats.aiConversations, icon: Bot, tone: "bg-[#ede7dc] text-[#0f2e2c]" },
@@ -155,7 +155,7 @@ export default function AdminConversationsPage() {
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search name, email, phone, GHL contact ID, or openId"
+                  placeholder="Search name, email, phone, Wibiz contact ID, or openId"
                   className="h-12 rounded-2xl border-[#ddd3c4] bg-white pl-10"
                 />
               </div>
@@ -165,7 +165,7 @@ export default function AdminConversationsPage() {
                   <TableRow>
                     <TableHead>Caregiver</TableHead>
                     <TableHead>Portal Status</TableHead>
-                    <TableHead>GHL Link</TableHead>
+                    <TableHead>Wibiz Link</TableHead>
                     <TableHead>Consent</TableHead>
                     <TableHead>Last Sign In</TableHead>
                     <TableHead />
@@ -250,7 +250,7 @@ export default function AdminConversationsPage() {
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl bg-[#ede7dc] px-4 py-3 text-sm">
-                        <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">GHL Contact</p>
+                        <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Wibiz Contact</p>
                         <p className="mt-1 font-medium text-[#0f2e2c]">{selectedDetail.identity?.ghlContactId || "Not linked"}</p>
                       </div>
                       <div className="rounded-2xl bg-[#ede7dc] px-4 py-3 text-sm">
@@ -324,7 +324,7 @@ export default function AdminConversationsPage() {
                 </>
               ) : (
                 <div className="rounded-[1.4rem] border border-dashed border-[#ddd3c4] bg-white/60 px-4 py-10 text-center text-sm text-muted-foreground">
-                  Select a caregiver to inspect the linked portal, GHL, and conversation data.
+                  Select a caregiver to inspect the linked portal, Wibiz, and conversation data.
                 </div>
               )}
             </CardContent>

@@ -4,7 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
-import { AlertTriangle, CheckCircle2, Loader2, Phone, PhoneCall, PhoneOff } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Globe,
+  Loader2,
+  Mic,
+  Phone,
+  PhoneCall,
+  PhoneOff,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -16,6 +25,7 @@ export default function CallPage() {
   const [activeCall, setActiveCall] = useState<{
     sessionId: string;
     conversationId: string;
+    mode: "phone" | "web_demo";
   } | null>(null);
 
   const { data: setupStatus } = trpc.identity.checkSetupStatus.useQuery();
@@ -23,13 +33,25 @@ export default function CallPage() {
 
   const initiateCall = trpc.calls.initiateCall.useMutation({
     onSuccess: (data) => {
-      setActiveCall({ sessionId: data.sessionId, conversationId: data.conversationId });
-      toast.success("Call initiated successfully", {
+      setActiveCall({ sessionId: data.sessionId, conversationId: data.conversationId, mode: "phone" });
+      toast.success("Phone call initiated", {
         description: `Session ID: ${data.sessionId}`,
       });
     },
     onError: (err) => {
-      toast.error("Failed to initiate call", { description: err.message });
+      toast.error("Failed to initiate phone call", { description: err.message });
+    },
+  });
+
+  const initiateWebCall = trpc.calls.initiateWebCall.useMutation({
+    onSuccess: (data) => {
+      toast.success("Browser demo call ready", {
+        description: "Opening the live demo room now.",
+      });
+      setLocation(`/call/${data.sessionId}/live`);
+    },
+    onError: (err) => {
+      toast.error("Failed to start browser demo call", { description: err.message });
     },
   });
 
@@ -41,7 +63,7 @@ export default function CallPage() {
     },
   });
 
-  const handleStartCall = () => {
+  const handleStartPhoneCall = () => {
     const phone = phoneNumber.trim() || identity?.phoneNumber;
     if (!phone) {
       toast.error("Please enter a phone number");
@@ -50,169 +72,182 @@ export default function CallPage() {
     initiateCall.mutate({ phoneNumber: phone });
   };
 
-  const isReady = setupStatus?.hasGHLContact && setupStatus?.elevenLabsConfigured;
+  const isPhoneReady = setupStatus?.hasGHLContact && setupStatus?.elevenLabsConfigured;
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Start a Voice Call</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Initiate an ElevenLabs AI voice call linked to your GHL contact record.
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="cg-panel rounded-[2rem] px-6 py-7 sm:px-8">
+          <p className="cg-label">Call Assistant</p>
+          <h1 className="cg-display mt-2 text-4xl font-bold text-[#0f2e2c] sm:text-5xl">Start a support call</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+            Use browser-based demo calling right away for presentations, or switch to live phone calling once the Wibiz and ElevenLabs telephony setup is fully enabled.
           </p>
         </div>
 
-        {/* Readiness Check */}
-        {setupStatus && !isReady && (
-          <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="py-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-amber-900">Setup required before calling</p>
-                  {!setupStatus.hasGHLContact && (
-                    <p className="text-xs text-amber-700">
-                      • Your account is not yet linked to a GHL contact. Visit Profile to set up your phone number.
-                    </p>
-                  )}
-                  {!setupStatus.elevenLabsConfigured && (
-                    <p className="text-xs text-amber-700">
-                      • ElevenLabs is not configured. Contact your administrator.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Active Call Card */}
-        {activeCall ? (
-          <Card className="border-emerald-200 bg-emerald-50">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <PhoneCall className="h-5 w-5 text-emerald-600 animate-pulse" />
-                </div>
-                <div>
-                  <CardTitle className="text-base text-emerald-900">Call in Progress</CardTitle>
-                  <CardDescription className="text-emerald-700 text-xs">
-                    ElevenLabs AI agent is active
-                  </CardDescription>
-                </div>
-                <Badge className="ml-auto bg-emerald-100 text-emerald-800 border-emerald-200">
-                  Active
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-white/70 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground font-medium">Session ID</p>
-                  <p className="font-mono text-xs mt-1 break-all">{activeCall.sessionId}</p>
-                </div>
-                <div className="bg-white/70 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground font-medium">Conversation ID</p>
-                  <p className="font-mono text-xs mt-1 break-all">{activeCall.conversationId}</p>
-                </div>
-              </div>
-              <p className="text-xs text-emerald-700 bg-emerald-100 rounded-lg px-3 py-2">
-                The AI agent will call the phone number you provided. Post-call data will automatically sync to GHL when the call ends.
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1 border-emerald-300 text-emerald-800 hover:bg-emerald-100"
-                  onClick={() => setLocation(`/call/${activeCall.sessionId}`)}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  View Details
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 border-red-200 text-red-700 hover:bg-red-50"
-                  onClick={() => markCompleted.mutate({ sessionId: activeCall.sessionId })}
-                  disabled={markCompleted.isPending}
-                >
-                  <PhoneOff className="h-4 w-4 mr-2" />
-                  Mark Complete
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card className="cg-panel rounded-[2rem] border-0">
             <CardHeader>
-              <CardTitle className="text-base">Initiate Call</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
+                <Globe className="h-5 w-5 text-[#1d4e4b]" />
+                Browser demo call
+              </CardTitle>
               <CardDescription>
-                Enter the phone number to call. The ElevenLabs AI agent will dial this number and your GHL contact will be updated automatically.
+                Best for demos today. Launch a guided web call room, walk through a scripted caregiver conversation, and save the outcome into portal history.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1 (555) 000-0000"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="font-mono"
-                />
-                {identity?.phoneNumber && !phoneNumber && (
-                  <p className="text-xs text-muted-foreground">
-                    Will use your saved number:{" "}
-                    <span className="font-mono font-medium">{identity.phoneNumber}</span>
-                  </p>
-                )}
+            <CardContent className="space-y-4">
+              <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/70 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">What this does</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Creates a real saved session in the portal, opens a browser call experience, and stores the demo transcript, summary, and outcome in call history when you finish.
+                </p>
               </div>
 
-              {/* Identity Info */}
-              {identity?.ghlContactId && (
-                <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Call will be linked to</p>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <p className="text-xs">
-                      GHL Contact:{" "}
-                      <span className="font-mono font-medium">{identity.ghlContactId}</span>
-                    </p>
-                  </div>
-                  {identity.consentGiven && (
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                      <p className="text-xs text-emerald-700">Consent previously verified</p>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary" className="rounded-full px-3 py-1">No telephony required</Badge>
+                <Badge variant="secondary" className="rounded-full px-3 py-1">Saved to portal history</Badge>
+                <Badge variant="secondary" className="rounded-full px-3 py-1">Ready for demos</Badge>
+              </div>
 
               <Button
-                className="w-full gap-2"
-                onClick={handleStartCall}
-                disabled={initiateCall.isPending || (!isReady && setupStatus !== undefined)}
+                className="w-full rounded-2xl bg-[#1d4e4b] hover:bg-[#0f2e2c]"
+                onClick={() => initiateWebCall.mutate()}
+                disabled={initiateWebCall.isPending}
               >
-                {initiateCall.isPending ? (
+                {initiateWebCall.isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Initiating Call...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Preparing browser call...
                   </>
                 ) : (
                   <>
-                    <Phone className="h-4 w-4" />
-                    Start Voice Call
+                    <Mic className="mr-2 h-4 w-4" />
+                    Start Browser Demo Call
                   </>
                 )}
               </Button>
             </CardContent>
           </Card>
-        )}
 
-        {/* Info Card */}
-        <Card className="bg-muted/30 border-dashed">
+          <Card className="cg-panel rounded-[2rem] border-0">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
+                <Phone className="h-5 w-5 text-[#1d4e4b]" />
+                Phone call
+              </CardTitle>
+              <CardDescription>
+                Uses ElevenLabs to dial a real phone number. Keep this for production once outbound calling is configured end to end.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {setupStatus && !isPhoneReady && (
+                <div className="rounded-[1.2rem] border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-amber-900">Phone calling still needs setup</p>
+                      {!setupStatus.hasGHLContact && (
+                        <p className="text-xs text-amber-700">
+                          Your account is not yet linked to a Wibiz contact. Visit Profile to finish the contact setup.
+                        </p>
+                      )}
+                      {!setupStatus.elevenLabsConfigured && (
+                        <p className="text-xs text-amber-700">
+                          ElevenLabs calling is not configured yet. Use the browser demo call for now.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeCall?.mode === "phone" ? (
+                <div className="rounded-[1.2rem] border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                      <PhoneCall className="h-5 w-5 animate-pulse text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-900">Phone call in progress</p>
+                      <p className="text-xs text-emerald-700">Session {activeCall.sessionId}</p>
+                    </div>
+                    <Badge className="ml-auto border-emerald-200 bg-emerald-100 text-emerald-800">Active</Badge>
+                  </div>
+
+                  <div className="mt-4 flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1 rounded-2xl border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                      onClick={() => setLocation(`/call/${activeCall.sessionId}`)}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      View Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 rounded-2xl border-red-200 text-red-700 hover:bg-red-50"
+                      onClick={() => markCompleted.mutate({ sessionId: activeCall.sessionId })}
+                      disabled={markCompleted.isPending}
+                    >
+                      <PhoneOff className="mr-2 h-4 w-4" />
+                      Mark Complete
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+65 9123 4567"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="font-mono"
+                    />
+                    {identity?.phoneNumber && !phoneNumber && (
+                      <p className="text-xs text-muted-foreground">
+                        Will use your saved number: <span className="font-mono font-medium">{identity.phoneNumber}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {identity?.ghlContactId && (
+                    <div className="rounded-[1.2rem] bg-[#ede7dc] p-4">
+                      <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#527a68]">Linked Wibiz contact</p>
+                      <p className="mt-2 font-mono text-sm text-[#0f2e2c]">{identity.ghlContactId}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-full rounded-2xl bg-[#1d4e4b] hover:bg-[#0f2e2c]"
+                    onClick={handleStartPhoneCall}
+                    disabled={initiateCall.isPending || (!isPhoneReady && setupStatus !== undefined)}
+                  >
+                    {initiateCall.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Initiating phone call...
+                      </>
+                    ) : (
+                      <>
+                        <Phone className="mr-2 h-4 w-4" />
+                        Start Phone Call
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="border-dashed bg-muted/30">
           <CardContent className="py-4">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              <strong className="text-foreground">How it works:</strong> When you start a call, the ElevenLabs AI agent will call the provided phone number. During the call, the agent collects information and verifies consent. After the call ends, a webhook automatically syncs the transcript, safety assessment, and outcome to your GoHighLevel contact record.
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              <strong className="text-foreground">Demo mode recommendation:</strong> for presentations, use the browser demo call. It keeps the portal experience complete while outbound telephony is still being finalized. When phone calling is ready, live call outcomes will continue syncing against the same Wibiz-linked caregiver record.
             </p>
           </CardContent>
         </Card>

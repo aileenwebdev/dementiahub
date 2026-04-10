@@ -7,6 +7,7 @@ import {
   getCallSessionBySessionId,
   getCallSessionsByUserId,
   getIdentityByUserId,
+  insertTranscriptChunk,
   getTranscriptsBySessionId,
   updateCallSession,
 } from "../db";
@@ -33,7 +34,7 @@ export const callsRouter = router({
       if (!config.elevenLabsApiKey || !config.elevenLabsAgentId) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "ElevenLabs is not configured. Please contact your administrator.",
+          message: "Voice calling is not configured yet. Please contact your administrator.",
         });
       }
 
@@ -43,7 +44,7 @@ export const callsRouter = router({
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message:
-            "Your account is not yet linked to a GHL contact. Please complete your profile setup.",
+            "Your account is not yet linked to a Wibiz contact. Please complete your profile setup.",
         });
       }
 
@@ -88,6 +89,35 @@ export const callsRouter = router({
         message: "Call initiated successfully",
       };
     }),
+
+  /**
+   * Initiate a browser-based demo call that still creates a real saved session.
+   */
+  initiateWebCall: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.user.id;
+    const identity = await getIdentityByUserId(userId);
+    const sessionId = `web_${Date.now()}_${userId}`;
+    const conversationId = `web_demo_${Date.now()}_${userId}`;
+
+    await createCallSession({
+      sessionId,
+      portalUserId: userId,
+      ghlContactId: identity?.ghlContactId,
+      ghlLocationId: identity?.ghlLocationId ?? config.ghlLocationId,
+      elevenlabsConversationId: conversationId,
+      elevenlabsAgentId: config.elevenLabsAgentId || "web-demo",
+      status: "active",
+      callStartTime: new Date(),
+    });
+
+    return {
+      sessionId,
+      conversationId,
+      status: "active",
+      mode: "web_demo" as const,
+      message: "Browser demo call ready",
+    };
+  }),
 
   /**
    * Get call history for the current user.
@@ -181,5 +211,71 @@ export const callsRouter = router({
       });
 
       return { success: true };
+    }),
+
+  completeWebCallDemo: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        transcript: z.array(
+          z.object({
+            speaker: z.enum(["agent", "user"]),
+            text: z.string().min(1),
+            timestamp: z.number(),
+          })
+        ),
+        callSummary: z.string().min(1),
+        topicClassified: z.string().default("general"),
+        resolutionType: z.string().default("self_serve"),
+        safetyResult: z.enum(["SAFE", "CAUTION", "UNSAFE"]).default("SAFE"),
+        callbackRequested: z.boolean().default(false),
+        consentVerballyConfirmed: z.boolean().default(true),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const session = await getCallSessionBySessionId(input.sessionId);
+      if (!session) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
+      }
+      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      if (!session.elevenlabsConversationId?.startsWith("web_demo_")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This session is not a browser demo call." });
+      }
+
+      for (const chunk of input.transcript) {
+        await insertTranscriptChunk({
+          sessionId: input.sessionId,
+          elevenlabsConversationId: session.elevenlabsConversationId,
+          speaker: chunk.speaker,
+          text: chunk.text,
+          timestamp: new Date(chunk.timestamp),
+        });
+      }
+
+      const startedAt = session.callStartTime ? new Date(session.callStartTime).getTime() : Date.now();
+      const endedAt = input.transcript.at(-1)?.timestamp ?? Date.now();
+      const durationSeconds = Math.max(30, Math.round((endedAt - startedAt) / 1000));
+      const transcriptRaw = input.transcript
+        .map((chunk) => `[${chunk.speaker.toUpperCase()}]: ${chunk.text}`)
+        .join("\n");
+
+      await updateCallSession(input.sessionId, {
+        status: "completed",
+        callEndTime: new Date(endedAt),
+        callDurationSeconds: durationSeconds,
+        callSummary: input.callSummary,
+        topicClassified: input.topicClassified,
+        resolutionType: input.resolutionType,
+        safetyResult: input.safetyResult,
+        callbackRequested: input.callbackRequested,
+        consentVerballyConfirmed: input.consentVerballyConfirmed,
+        consentTimestamp: input.consentVerballyConfirmed ? new Date(endedAt) : null,
+        escalationTriggered: input.safetyResult === "UNSAFE",
+        transcriptRaw,
+      });
+
+      return { success: true } as const;
     }),
 });

@@ -59,9 +59,9 @@ export default function Home() {
 
       <p className="mb-4 mt-6 text-[11px] uppercase tracking-[0.18em] text-white/32">Portal Status</p>
       <div className="space-y-3">
-        <StatusIndicator ok={integrationStatus?.ghl.configured ?? false} label="GHL configured" />
-        <StatusIndicator ok={integrationStatus?.ghl.connected ?? false} label="GHL connected" />
-        <StatusIndicator ok={setupStatus?.hasGHLContact ?? false} label="Contact linked" />
+        <StatusIndicator ok={integrationStatus?.ghl.configured ?? false} label="Wibiz configured" />
+        <StatusIndicator ok={integrationStatus?.ghl.connected ?? false} label="Wibiz connected" />
+        <StatusIndicator ok={setupStatus?.hasGHLContact ?? false} label="Wibiz contact linked" />
         <StatusIndicator ok={setupStatus?.consentGiven ?? false} label="Consent verified" />
       </div>
 
@@ -207,13 +207,13 @@ export default function Home() {
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="flex items-center justify-between rounded-2xl bg-white/65 px-4 py-3">
-                  <span>GHL Configured</span>
+                  <span>Wibiz Configured</span>
                   <span className={integrationStatus?.ghl.configured ? "text-emerald-600" : "text-muted-foreground"}>
                     {integrationStatus?.ghl.configured ? "Ready" : "Pending"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded-2xl bg-white/65 px-4 py-3">
-                  <span>GHL Contact Linked</span>
+                  <span>Wibiz Contact Linked</span>
                   <span className={setupStatus?.hasGHLContact ? "text-emerald-600" : "text-muted-foreground"}>
                     {setupStatus?.hasGHLContact ? "Linked" : "Not linked"}
                   </span>

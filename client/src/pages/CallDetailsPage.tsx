@@ -78,6 +78,7 @@ export default function CallDetailsPage() {
   }
 
   const { session, transcriptChunks } = data;
+  const isWebDemo = session.sessionId.startsWith("web_");
 
   // Build transcript from DB chunks or fall back to raw text
   const transcriptLines: Array<{ speaker: string; text: string }> = transcriptChunks.length > 0
@@ -102,7 +103,11 @@ export default function CallDetailsPage() {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight capitalize">
-                {session.topicClassified ? session.topicClassified.replace(/_/g, " ") : "Voice Call"}
+                {session.topicClassified
+                  ? session.topicClassified.replace(/_/g, " ")
+                  : isWebDemo
+                    ? "Browser Demo Call"
+                    : "Phone Call"}
               </h1>
               <p className="text-muted-foreground mt-1 text-sm">
                 {new Date(session.createdAt).toLocaleDateString(undefined, {
@@ -237,6 +242,7 @@ export default function CallDetailsPage() {
               </CardHeader>
               <CardContent className="space-y-0 divide-y divide-border">
                 <MetaRow label="Status" value={session.status} />
+                <MetaRow label="Channel" value={isWebDemo ? "Browser demo" : "Phone call"} />
                 <MetaRow
                   label="Duration"
                   value={session.callDurationSeconds
@@ -270,12 +276,12 @@ export default function CallDetailsPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <ExternalLink className="h-4 w-4 text-primary" />
-                  GHL Integration
+                  Wibiz Integration
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-0 divide-y divide-border">
                 <MetaRow
-                  label="GHL Synced"
+                  label="Wibiz Synced"
                   value={
                     session.ghlSynced ? (
                       <span className="text-emerald-600 flex items-center gap-1">

@@ -51,7 +51,7 @@ export default function AdminIntegrationPage() {
           <ShieldAlert className="mx-auto h-12 w-12 text-[#b77642]" />
           <h1 className="cg-display mt-4 text-3xl font-bold text-[#0f2e2c]">Admin access required</h1>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            Only admin accounts can inspect the GHL and ElevenLabs integration wiring.
+            Only admin accounts can inspect the Wibiz and ElevenLabs integration wiring.
           </p>
           <Button onClick={() => setLocation("/")} className="mt-6 rounded-full bg-[#1d4e4b] hover:bg-[#0f2e2c]">
             Return to dashboard
@@ -69,7 +69,7 @@ export default function AdminIntegrationPage() {
             <div className="max-w-2xl">
               <p className="cg-label">Integration Diagnostics</p>
               <h1 className="cg-display mt-2 text-4xl font-bold text-[#0f2e2c] sm:text-5xl">
-                GHL and ElevenLabs wiring
+                Wibiz and ElevenLabs wiring
               </h1>
               <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">
                 Review the location-level CRM configuration, ElevenLabs call wiring, webhook endpoints, and queued sync failures before we switch to your final production keys.
@@ -90,7 +90,7 @@ export default function AdminIntegrationPage() {
                 className="rounded-full bg-[#1d4e4b] hover:bg-[#0f2e2c]"
               >
                 <RefreshCcw className="mr-2 h-4 w-4" />
-                {refreshPipeline.isPending ? "Refreshing..." : "Refresh GHL pipeline cache"}
+                {refreshPipeline.isPending ? "Refreshing..." : "Refresh Wibiz pipeline cache"}
               </Button>
             </div>
           </div>
@@ -101,7 +101,7 @@ export default function AdminIntegrationPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
                 <Link2 className="h-5 w-5 text-[#1d4e4b]" />
-                GoHighLevel
+                Wibiz
               </CardTitle>
               <CardDescription>Portal-to-CRM caregiver identity bridge and case pipeline visibility.</CardDescription>
             </CardHeader>
@@ -232,7 +232,7 @@ export default function AdminIntegrationPage() {
                 <Activity className="h-5 w-5 text-[#1d4e4b]" />
                 Failed Sync Queue
               </CardTitle>
-              <CardDescription>Webhook payloads that failed to sync into GHL and may need admin follow-up.</CardDescription>
+              <CardDescription>Webhook payloads that failed to sync into Wibiz and may need admin follow-up.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>

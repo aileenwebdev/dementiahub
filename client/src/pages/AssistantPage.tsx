@@ -45,7 +45,7 @@ export default function AssistantPage() {
 
         <div className="mt-4 space-y-3 text-sm">
           <div>
-            <p className="text-white/36">GHL contact</p>
+            <p className="text-white/36">Wibiz contact</p>
             <div className="mt-1">
               {identity?.ghlContactId ? (
                 <Badge className="bg-[#d4935a]/18 text-[#edb27e] hover:bg-[#d4935a]/18">{identity.ghlContactId}</Badge>
@@ -108,7 +108,7 @@ export default function AssistantPage() {
             {
               icon: Link2,
               title: "Portal linkage",
-              text: "GHL contact linkage and caregiver context stay attached to the same account.",
+              text: "Wibiz contact linkage and caregiver context stay attached to the same account.",
             },
           ].map((item) => (
             <div key={item.title} className="cg-stat rounded-[1.5rem] p-5">
