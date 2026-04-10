@@ -35,15 +35,23 @@ export function ElevenLabsChatBox({
   const appendPortalMessageRef = useRef<ReturnType<typeof trpc.ai.appendPortalMessage.useMutation> | null>(null);
   const startedSessionRef = useRef<string | null>(null);
   const seenMessageEventsRef = useRef<Set<string>>(new Set());
+  const hasSeededInitialMessagesRef = useRef(false);
   const appendPortalMessage = trpc.ai.appendPortalMessage.useMutation();
   const sessionQuery = trpc.ai.getElevenLabsSession.useQuery(undefined, {
     retry: 1,
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   appendPortalMessageRef.current = appendPortalMessage;
 
   useEffect(() => {
+    if (hasSeededInitialMessagesRef.current) {
+      return;
+    }
     setMessages(initialMessages);
+    hasSeededInitialMessagesRef.current = true;
   }, [initialMessages]);
 
   const scrollToBottom = () => {

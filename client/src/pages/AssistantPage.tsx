@@ -6,8 +6,16 @@ import { trpc } from "@/lib/trpc";
 import { Brain, Link2, MessagesSquare, UserRound } from "lucide-react";
 
 export default function AssistantPage() {
-  const { data, isLoading } = trpc.ai.getMyConversation.useQuery();
-  const { data: identity } = trpc.identity.getMyIdentity.useQuery();
+  const { data, isLoading } = trpc.ai.getMyConversation.useQuery(undefined, {
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  const { data: identity } = trpc.identity.getMyIdentity.useQuery(undefined, {
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 
   const sidebar = (
     <div className="cg-sidebar-card sticky top-[104px] rounded-[1.6rem] p-6">
