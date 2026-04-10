@@ -61,8 +61,15 @@ export function ElevenLabsChatBox({
   }, [messages, streamingReply]);
 
   useEffect(() => {
+    if (sessionQuery.error) {
+      setError(sessionQuery.error.message);
+      setStatus("disconnected");
+      setIsBooting(false);
+      return;
+    }
+
     const session = sessionQuery.data;
-    if (!session?.signedUrl || conversationRef.current || isBooting) {
+    if (!session?.signedUrl || conversationRef.current) {
       return;
     }
 
@@ -163,7 +170,7 @@ export function ElevenLabsChatBox({
         void activeConversation.endSession();
       }
     };
-  }, [appendPortalMessage, isBooting, sessionQuery.data]);
+  }, [appendPortalMessage, sessionQuery.data, sessionQuery.error]);
 
   const handleSend = () => {
     const trimmed = input.trim();
