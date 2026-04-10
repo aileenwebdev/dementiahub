@@ -33,6 +33,8 @@ export function ElevenLabsChatBox({
   const conversationRef = useRef<TextConversation | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const appendPortalMessageRef = useRef<ReturnType<typeof trpc.ai.appendPortalMessage.useMutation> | null>(null);
+  const startedSessionRef = useRef<string | null>(null);
+  const seenMessageEventsRef = useRef<Set<string>>(new Set());
   const appendPortalMessage = trpc.ai.appendPortalMessage.useMutation();
   const sessionQuery = trpc.ai.getElevenLabsSession.useQuery(undefined, {
     retry: 1,
@@ -76,6 +78,10 @@ export function ElevenLabsChatBox({
       return;
     }
 
+    if (startedSessionRef.current === session.signedUrl) {
+      return;
+    }
+
     let cancelled = false;
     let connectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -94,6 +100,8 @@ export function ElevenLabsChatBox({
         const conversation = await Conversation.startSession({
           signedUrl: session.signedUrl,
           textOnly: true,
+          dynamicVariables: session.dynamicVariables,
+          userId: String(session.conversationId),
           onStatusChange: ({ status: nextStatus }) => {
             if (!cancelled) {
               setStatus(nextStatus);
@@ -132,8 +140,15 @@ export function ElevenLabsChatBox({
               setStreamingReply("");
             }
           },
-          onMessage: ({ message, role }) => {
+          onMessage: ({ message, role, event_id }) => {
             if (cancelled) return;
+            if (typeof event_id === "number") {
+              const dedupeKey = `${role}:${event_id}`;
+              if (seenMessageEventsRef.current.has(dedupeKey)) {
+                return;
+              }
+              seenMessageEventsRef.current.add(dedupeKey);
+            }
 
             const nextMessage: StoredMessage = {
               role: role === "agent" ? "assistant" : "user",
@@ -160,6 +175,7 @@ export function ElevenLabsChatBox({
           connectionTimeout = null;
         }
 
+        startedSessionRef.current = session.signedUrl;
         conversationRef.current = conversation;
         if (session.contextualMemory) {
           conversation.sendContextualUpdate(session.contextualMemory);
@@ -172,6 +188,7 @@ export function ElevenLabsChatBox({
         if (!cancelled) {
           setStatus("disconnected");
           setError(err instanceof Error ? err.message : "Failed to start ElevenLabs chat");
+          startedSessionRef.current = null;
         }
       } finally {
         if (!cancelled) {
@@ -189,6 +206,8 @@ export function ElevenLabsChatBox({
       }
       const activeConversation = conversationRef.current;
       conversationRef.current = null;
+      startedSessionRef.current = null;
+      seenMessageEventsRef.current.clear();
       if (activeConversation) {
         void activeConversation.endSession();
       }
@@ -208,6 +227,8 @@ export function ElevenLabsChatBox({
   const handleReconnect = async () => {
     const activeConversation = conversationRef.current;
     conversationRef.current = null;
+    startedSessionRef.current = null;
+    seenMessageEventsRef.current.clear();
     if (activeConversation) {
       await activeConversation.endSession();
     }
