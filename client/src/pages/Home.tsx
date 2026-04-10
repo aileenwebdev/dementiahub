@@ -3,17 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import {
-  Activity,
-  AlertTriangle,
-  Brain,
-  CheckCircle2,
-  Clock,
-  Phone,
-  PhoneCall,
-  Shield,
-  XCircle,
-} from "lucide-react";
+import { Activity, AlertTriangle, Brain, CheckCircle2, Clock, Phone, PhoneCall, Shield, XCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import DashboardLayout from "../components/DashboardLayout";
@@ -28,13 +18,9 @@ function SafetyBadge({ result }: { result?: string | null }) {
 
 function StatusIndicator({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <div className="flex items-center gap-2">
-      {ok ? (
-        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-      ) : (
-        <XCircle className="h-4 w-4 text-red-400 shrink-0" />
-      )}
-      <span className="text-sm text-muted-foreground">{label}</span>
+    <div className="flex items-center gap-2 text-sm">
+      {ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" /> : <XCircle className="h-4 w-4 shrink-0 text-red-400" />}
+      <span className="text-white/76">{label}</span>
     </div>
   );
 }
@@ -42,10 +28,10 @@ function StatusIndicator({ ok, label }: { ok: boolean; label: string }) {
 export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-
   const { data: callHistory } = trpc.calls.getCallHistory.useQuery({ limit: 5 });
   const { data: integrationStatus } = trpc.ghl.getIntegrationStatus.useQuery();
   const { data: setupStatus } = trpc.identity.checkSetupStatus.useQuery();
+  const { data: identity } = trpc.identity.getMyIdentity.useQuery();
   const postLoginSync = trpc.auth.postLoginSync.useMutation();
 
   useEffect(() => {
@@ -58,209 +44,215 @@ export default function Home() {
   const callbackPending = callHistory?.filter((c) => c.callbackRequested && c.status !== "synced").length ?? 0;
   const recentCalls = callHistory?.slice(0, 5) ?? [];
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Welcome back, {user?.name?.split(" ")[0] ?? "there"}
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              DementiaHub Voice AI Portal — your caregiver support dashboard
-            </p>
-          </div>
-          <Button onClick={() => setLocation("/call")} className="gap-2 shadow-sm">
-            <Phone className="h-4 w-4" />
-            Start a Call
-          </Button>
+  const sidebar = (
+    <div className="cg-sidebar-card sticky top-[104px] rounded-[1.6rem] p-6">
+      <p className="mb-4 text-[11px] uppercase tracking-[0.18em] text-white/32">Your Profile</p>
+      <div className="rounded-[1.25rem] border border-white/10 bg-white/6 p-5">
+        <p className="cg-display text-2xl font-bold text-white">{user?.name ?? "Caregiver"}</p>
+        <p className="mt-2 text-sm text-white/46">{identity?.phoneNumber ?? "Add your phone number in profile"}</p>
+        <p className="mt-1 text-sm text-white/46">{user?.email ?? "Portal account"}</p>
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#d4935a]/18 px-3 py-1 text-xs text-[#edb27e]">
+          <Brain className="h-3.5 w-3.5" />
+          {identity?.preferredLanguage ?? "English"}
         </div>
+      </div>
 
-        {/* Setup Banner */}
+      <p className="mb-4 mt-6 text-[11px] uppercase tracking-[0.18em] text-white/32">Portal Status</p>
+      <div className="space-y-3">
+        <StatusIndicator ok={integrationStatus?.ghl.configured ?? false} label="GHL configured" />
+        <StatusIndicator ok={integrationStatus?.ghl.connected ?? false} label="GHL connected" />
+        <StatusIndicator ok={setupStatus?.hasGHLContact ?? false} label="Contact linked" />
+        <StatusIndicator ok={setupStatus?.consentGiven ?? false} label="Consent verified" />
+      </div>
+
+      <div className="mt-8 rounded-[1.4rem] bg-gradient-to-br from-[#d4935a] to-[#b77642] p-5 text-white">
+        <p className="cg-display text-xl font-bold">Need urgent help?</p>
+        <p className="mt-2 text-3xl font-black tracking-tight">6377 0700</p>
+        <p className="mt-1 text-sm text-white/72">Mon-Fri 9am-6pm, Sat 9am-1pm</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <DashboardLayout sidebar={sidebar}>
+      <div className="space-y-6">
+        <section className="cg-panel rounded-[2rem] px-6 py-7 sm:px-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="cg-label">Caregiver Workspace</p>
+              <h1 className="cg-display mt-2 text-4xl font-bold text-[#0f2e2c] sm:text-5xl">
+                Hello, {user?.name?.split(" ")[0] ?? "there"}.
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">
+                Your assistant, call records, and support pathways live here. The portal now keeps your caregiver identity and AI context together.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#7a9e8a]/22 bg-[#7a9e8a]/10 px-4 py-2 text-sm font-medium text-[#527a68]">
+                <span className="h-2 w-2 rounded-full bg-[#7a9e8a]" />
+                AI assistant online
+              </div>
+              <Button onClick={() => setLocation("/assistant")} className="h-11 rounded-full bg-[#1d4e4b] px-5 hover:bg-[#0f2e2c]">
+                Open Assistant
+              </Button>
+            </div>
+          </div>
+        </section>
+
         {setupStatus && !setupStatus.hasPhone && (
-          <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="flex items-center justify-between py-4">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+          <section className="rounded-[1.6rem] border border-[#d4935a]/24 bg-[#d4935a]/10 px-5 py-4 text-[#84532d]">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#b77642]" />
                 <div>
-                  <p className="text-sm font-medium text-amber-900">Profile setup incomplete</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Add your phone number to enable voice calls and GHL contact linking.
-                  </p>
+                  <p className="font-medium">Profile setup incomplete</p>
+                  <p className="mt-1 text-sm">Add your phone number to enable voice calls and keep your caregiver record fully linked.</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLocation("/profile")}
-                className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
-              >
+              <Button variant="outline" onClick={() => setLocation("/profile")} className="rounded-full border-[#d4935a]/35 bg-white/70 text-[#84532d] hover:bg-white">
                 Complete Setup
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         )}
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Total Calls", value: totalCalls, icon: PhoneCall, tone: "bg-[#1d4e4b]/10 text-[#1d4e4b]" },
+            { label: "Completed", value: completedCalls, icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-700" },
+            { label: "Safe Calls", value: safeCalls, icon: Shield, tone: "bg-[#7a9e8a]/14 text-[#527a68]" },
+            { label: "Callbacks Due", value: callbackPending, icon: Clock, tone: "bg-[#d4935a]/14 text-[#b77642]" },
+          ].map((stat) => (
+            <div key={stat.label} className="cg-stat rounded-[1.5rem] p-5">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Calls</p>
-                  <p className="text-2xl font-bold mt-1">{totalCalls}</p>
+                  <p className="cg-label">{stat.label}</p>
+                  <p className="mt-3 text-4xl font-semibold tracking-tight text-[#0f2e2c]">{stat.value}</p>
                 </div>
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <PhoneCall className="h-5 w-5 text-primary" />
+                <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${stat.tone}`}>
+                  <stat.icon className="h-5 w-5" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completed</p>
-                  <p className="text-2xl font-bold mt-1">{completedCalls}</p>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Safe Calls</p>
-                  <p className="text-2xl font-bold mt-1">{safeCalls}</p>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <Shield className="h-5 w-5 text-emerald-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Callbacks Due</p>
-                  <p className="text-2xl font-bold mt-1">{callbackPending}</p>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Clock className="h-5 w-5 text-amber-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          ))}
+        </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Calls */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-semibold">Recent Calls</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setLocation("/history")} className="text-xs text-muted-foreground">
-                    View all
-                  </Button>
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+          <div className="cg-panel rounded-[2rem] p-6">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <p className="cg-label">Recent Call History</p>
+                <h2 className="cg-display mt-2 text-3xl font-bold text-[#0f2e2c]">Your latest conversations</h2>
+              </div>
+              <Button variant="ghost" onClick={() => setLocation("/history")} className="rounded-full text-[#527a68] hover:bg-[#ede7dc] hover:text-[#0f2e2c]">
+                View all
+              </Button>
+            </div>
+
+            {recentCalls.length === 0 ? (
+              <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-[#ddd3c4] bg-white/50 px-6 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ede7dc]">
+                  <PhoneCall className="h-6 w-6 text-[#527a68]" />
                 </div>
-              </CardHeader>
-              <CardContent>
-                {recentCalls.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
-                      <PhoneCall className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm font-medium text-muted-foreground">No calls yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">Start your first call to see it here</p>
-                    <Button size="sm" className="mt-4 gap-2" onClick={() => setLocation("/call")}>
-                      <Phone className="h-3.5 w-3.5" />
-                      Start a Call
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {recentCalls.map((call) => (
-                      <div
-                        key={call.id}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={() => setLocation(`/call/${call.sessionId}`)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <Phone className="h-3.5 w-3.5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium capitalize">
-                              {call.topicClassified ? call.topicClassified.replace(/_/g, " ") : "Voice Call"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(call.createdAt).toLocaleDateString(undefined, {
-                                month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-                              })}
-                              {call.callDurationSeconds
-                                ? ` · ${Math.floor(call.callDurationSeconds / 60)}m ${call.callDurationSeconds % 60}s`
-                                : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <SafetyBadge result={call.safetyResult} />
+                <p className="mt-4 text-lg font-medium text-[#0f2e2c]">No calls yet</p>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+                  Start your first call to build a support history for this caregiver account.
+                </p>
+                <Button onClick={() => setLocation("/call")} className="mt-5 rounded-full bg-[#1d4e4b] px-5 hover:bg-[#0f2e2c]">
+                  Start a Call
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentCalls.map((call) => (
+                  <button
+                    key={call.id}
+                    onClick={() => setLocation(`/call/${call.sessionId}`)}
+                    className="cg-soft-raise flex w-full items-center justify-between rounded-[1.3rem] border border-[#ddd3c4] bg-white/65 p-4 text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1d4e4b]/10">
+                        <Phone className="h-5 w-5 text-[#1d4e4b]" />
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      <div>
+                        <p className="font-medium capitalize text-[#0f2e2c]">
+                          {call.topicClassified ? call.topicClassified.replace(/_/g, " ") : "Voice call"}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {new Date(call.createdAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <SafetyBadge result={call.safetyResult} />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Right column */}
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-primary" />
+          <div className="space-y-6">
+            <Card className="cg-panel rounded-[2rem] border-0">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg text-[#0f2e2c]">
+                  <Activity className="h-5 w-5 text-[#1d4e4b]" />
                   Integration Status
                 </CardTitle>
+                <CardDescription>Current health of your connected caregiver systems.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <StatusIndicator ok={integrationStatus?.ghl.configured ?? false} label="GHL Configured" />
-                <StatusIndicator ok={integrationStatus?.ghl.connected ?? false} label="GHL Connected" />
-                <StatusIndicator ok={integrationStatus?.elevenlabs.configured ?? false} label="ElevenLabs Configured" />
-                <StatusIndicator ok={setupStatus?.hasGHLContact ?? false} label="GHL Contact Linked" />
-                <StatusIndicator ok={setupStatus?.consentGiven ?? false} label="Consent Verified" />
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between rounded-2xl bg-white/65 px-4 py-3">
+                  <span>GHL Configured</span>
+                  <span className={integrationStatus?.ghl.configured ? "text-emerald-600" : "text-muted-foreground"}>
+                    {integrationStatus?.ghl.configured ? "Ready" : "Pending"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-white/65 px-4 py-3">
+                  <span>GHL Contact Linked</span>
+                  <span className={setupStatus?.hasGHLContact ? "text-emerald-600" : "text-muted-foreground"}>
+                    {setupStatus?.hasGHLContact ? "Linked" : "Not linked"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-white/65 px-4 py-3">
+                  <span>Consent Verified</span>
+                  <span className={setupStatus?.consentGiven ? "text-emerald-600" : "text-muted-foreground"}>
+                    {setupStatus?.consentGiven ? "Verified" : "Awaiting"}
+                  </span>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-primary" />
-                  Webhook URLs
+            <Card className="cg-panel rounded-[2rem] border-0">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg text-[#0f2e2c]">
+                  <Brain className="h-5 w-5 text-[#1d4e4b]" />
+                  Quick Actions
                 </CardTitle>
-                <CardDescription className="text-xs">Configure in ElevenLabs agent settings</CardDescription>
+                <CardDescription>Fast entry points for the most common caregiver workflows.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Post-Call Webhook</p>
-                  <code className="text-xs bg-muted px-2 py-1 rounded block break-all">
-                    {integrationStatus?.webhookUrl ?? "Loading..."}
-                  </code>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Consent Webhook</p>
-                  <code className="text-xs bg-muted px-2 py-1 rounded block break-all">
-                    {integrationStatus?.consentWebhookUrl ?? "Loading..."}
-                  </code>
-                </div>
+              <CardContent className="grid gap-3">
+                {[
+                  { label: "Continue assistant chat", action: () => setLocation("/assistant") },
+                  { label: "Review profile linkage", action: () => setLocation("/profile") },
+                  { label: "Start a new call", action: () => setLocation("/call") },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={item.action}
+                    className="cg-soft-raise rounded-[1.2rem] border border-[#ddd3c4] bg-white/65 px-4 py-4 text-left text-sm font-medium text-[#0f2e2c]"
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </CardContent>
             </Card>
           </div>
-        </div>
+        </section>
       </div>
     </DashboardLayout>
   );

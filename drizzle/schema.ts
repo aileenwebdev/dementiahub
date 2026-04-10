@@ -17,6 +17,7 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  passwordHash: text("passwordHash"),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -121,3 +122,35 @@ export const failedSyncQueue = mysqlTable("failed_sync_queue", {
 
 export type FailedSyncQueue = typeof failedSyncQueue.$inferSelect;
 export type InsertFailedSyncQueue = typeof failedSyncQueue.$inferInsert;
+
+/**
+ * Caregiver AI chat conversations.
+ * Keeps a stable conversation thread for each logged-in portal user.
+ */
+export const aiChatConversations = mysqlTable("ai_chat_conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  portalUserId: int("portal_user_id").notNull(),
+  title: varchar("title", { length: 255 }),
+  status: mysqlEnum("status", ["active", "archived"]).default("active").notNull(),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AIChatConversation = typeof aiChatConversations.$inferSelect;
+export type InsertAIChatConversation = typeof aiChatConversations.$inferInsert;
+
+/**
+ * Caregiver AI chat messages stored inside the portal.
+ */
+export const aiChatMessages = mysqlTable("ai_chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversation_id").notNull(),
+  portalUserId: int("portal_user_id").notNull(),
+  role: mysqlEnum("role", ["system", "user", "assistant"]).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AIChatMessage = typeof aiChatMessages.$inferSelect;
+export type InsertAIChatMessage = typeof aiChatMessages.$inferInsert;

@@ -1,9 +1,13 @@
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
+  aiChatConversations,
+  aiChatMessages,
   callSessions,
   callTranscripts,
   failedSyncQueue,
+  InsertAIChatConversation,
+  InsertAIChatMessage,
   InsertCallSession,
   InsertCallTranscript,
   InsertFailedSyncQueue,
@@ -12,7 +16,6 @@ import {
   userIdentityMap,
   users,
 } from "../drizzle/schema";
-import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -46,7 +49,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "passwordHash"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -66,9 +69,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
@@ -104,6 +104,13 @@ export async function getUserById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -260,4 +267,67 @@ export async function markSyncResolved(id: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
   await db.update(failedSyncQueue).set({ resolved: true }).where(eq(failedSyncQueue.id, id));
+}
+
+// AI Chat Operations
+
+export async function getActiveAIChatConversationByUserId(portalUserId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(aiChatConversations)
+    .where(
+      and(
+        eq(aiChatConversations.portalUserId, portalUserId),
+        eq(aiChatConversations.status, "active")
+      )
+    )
+    .orderBy(desc(aiChatConversations.updatedAt))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getAIChatConversationById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(aiChatConversations)
+    .where(eq(aiChatConversations.id, id))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createAIChatConversation(data: InsertAIChatConversation) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(aiChatConversations).values(data).$returningId();
+  return result[0]?.id;
+}
+
+export async function touchAIChatConversation(conversationId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(aiChatConversations)
+    .set({ lastMessageAt: new Date() })
+    .where(eq(aiChatConversations.id, conversationId));
+}
+
+export async function createAIChatMessage(data: InsertAIChatMessage): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(aiChatMessages).values(data);
+}
+
+export async function getAIChatMessagesByConversationId(conversationId: number, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(aiChatMessages)
+    .where(eq(aiChatMessages.conversationId, conversationId))
+    .orderBy(aiChatMessages.createdAt)
+    .limit(limit);
 }

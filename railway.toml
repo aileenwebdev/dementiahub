@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "pnpm db:push && node dist/index.js"
+healthcheckPath = "/api/trpc/system.health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"

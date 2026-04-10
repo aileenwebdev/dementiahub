@@ -4,18 +4,22 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import AssistantPage from "./pages/AssistantPage";
 import Home from "./pages/Home";
 import CallPage from "./pages/CallPage";
 import CallHistoryPage from "./pages/CallHistoryPage";
 import CallDetailsPage from "./pages/CallDetailsPage";
 import ProfilePage from "./pages/ProfilePage";
 import LiveCallPage from "./pages/LiveCallPage";
+import LoginPage from "./pages/LoginPage";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
+      <Route path={"/login"} component={LoginPage} />
       <Route path={"/"} component={Home} />
+      <Route path={"/assistant"} component={AssistantPage} />
       <Route path={"/call"} component={CallPage} />
       <Route path={"/call/:sessionId"} component={CallDetailsPage} />
       <Route path={"/call/:sessionId/live"} component={LiveCallPage} />

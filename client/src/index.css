@@ -1,6 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @custom-variant dark (&:is(.dark *));
 
@@ -44,87 +44,101 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  /* DementiaHub — calm teal/blue palette for healthcare context */
-  --background: oklch(0.98 0.005 220);
-  --foreground: oklch(0.18 0.015 240);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.015 240);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.015 240);
-  --primary: oklch(0.48 0.12 220);
-  --primary-foreground: oklch(0.98 0.005 220);
-  --secondary: oklch(0.94 0.02 220);
-  --secondary-foreground: oklch(0.28 0.04 220);
-  --muted: oklch(0.95 0.01 220);
-  --muted-foreground: oklch(0.52 0.025 220);
-  --accent: oklch(0.93 0.03 220);
-  --accent-foreground: oklch(0.28 0.04 220);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.9 0.01 220);
-  --input: oklch(0.9 0.01 220);
-  --ring: oklch(0.48 0.12 220);
-  --chart-1: oklch(0.48 0.12 220);
-  --chart-2: oklch(0.6 0.1 160);
-  --chart-3: oklch(0.7 0.12 80);
-  --chart-4: oklch(0.55 0.15 300);
-  --chart-5: oklch(0.65 0.12 30);
-  --sidebar: oklch(0.97 0.007 220);
-  --sidebar-foreground: oklch(0.18 0.015 240);
-  --sidebar-primary: oklch(0.48 0.12 220);
-  --sidebar-primary-foreground: oklch(0.98 0.005 220);
-  --sidebar-accent: oklch(0.93 0.03 220);
-  --sidebar-accent-foreground: oklch(0.28 0.04 220);
-  --sidebar-border: oklch(0.9 0.01 220);
-  --sidebar-ring: oklch(0.48 0.12 220);
+  --radius: 1rem;
+  --background: #f2ede3;
+  --foreground: #2c2c2c;
+  --card: #ffffff;
+  --card-foreground: #2c2c2c;
+  --popover: #ffffff;
+  --popover-foreground: #2c2c2c;
+  --primary: #1d4e4b;
+  --primary-foreground: #ffffff;
+  --secondary: #ede7dc;
+  --secondary-foreground: #1d4e4b;
+  --muted: #e6ddd0;
+  --muted-foreground: #7a7a72;
+  --accent: #edf3ef;
+  --accent-foreground: #0f2e2c;
+  --destructive: #c0392b;
+  --destructive-foreground: #ffffff;
+  --border: #ddd3c4;
+  --input: #ddd3c4;
+  --ring: #7a9e8a;
+  --chart-1: #1d4e4b;
+  --chart-2: #7a9e8a;
+  --chart-3: #d4935a;
+  --chart-4: #527a68;
+  --chart-5: #edb27e;
+  --sidebar: #0f2e2c;
+  --sidebar-foreground: #f9f5ee;
+  --sidebar-primary: #d4935a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(122, 158, 138, 0.14);
+  --sidebar-accent-foreground: #f9f5ee;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #d4935a;
 }
 
 .dark {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.85 0.005 65);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.85 0.005 65);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.85 0.005 65);
-  --secondary: oklch(0.24 0.006 286.033);
-  --secondary-foreground: oklch(0.7 0.005 65);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground:  oklch(0.92 0.005 65);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.488 0.243 264.376);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.85 0.005 65);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground:  oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.488 0.243 264.376);
+  --background: #102725;
+  --foreground: #f5efe7;
+  --card: #173533;
+  --card-foreground: #f5efe7;
+  --popover: #173533;
+  --popover-foreground: #f5efe7;
+  --primary: #edb27e;
+  --primary-foreground: #0f2e2c;
+  --secondary: #21413f;
+  --secondary-foreground: #f5efe7;
+  --muted: #1d3a38;
+  --muted-foreground: #c7bfb1;
+  --accent: #244947;
+  --accent-foreground: #f5efe7;
+  --destructive: #e16b5c;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #edb27e;
+  --chart-1: #edb27e;
+  --chart-2: #7a9e8a;
+  --chart-3: #f2ede3;
+  --chart-4: #d4935a;
+  --chart-5: #527a68;
+  --sidebar: #0c2120;
+  --sidebar-foreground: #f5efe7;
+  --sidebar-primary: #edb27e;
+  --sidebar-primary-foreground: #0f2e2c;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #f5efe7;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #edb27e;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: "DM Sans", sans-serif;
+    background-image:
+      radial-gradient(circle at top right, rgba(122, 158, 138, 0.16), transparent 24rem),
+      radial-gradient(circle at bottom left, rgba(212, 147, 90, 0.1), transparent 20rem);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Playfair Display", serif;
+    letter-spacing: -0.02em;
+  }
+
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [type="button"]:not(:disabled),
@@ -139,24 +153,11 @@
 }
 
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -165,18 +166,125 @@
     min-width: 0;
   }
 
+  .cg-panel {
+    border: 1px solid rgba(82, 122, 104, 0.1);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 18px 40px rgba(29, 78, 75, 0.06);
+  }
+
+  .cg-label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #527a68;
+  }
+
+  .cg-display {
+    font-family: "Playfair Display", serif;
+    letter-spacing: -0.03em;
+  }
+
+  .cg-auth-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top right, rgba(122, 158, 138, 0.12), transparent 26rem),
+      linear-gradient(180deg, #f4efe5 0%, #efe7da 100%);
+  }
+
+  .cg-auth-left {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, #123432 0%, #0f2e2c 100%);
+  }
+
+  .cg-auth-left::before {
+    content: "";
+    position: absolute;
+    top: -7rem;
+    right: -6rem;
+    width: 20rem;
+    height: 20rem;
+    border-radius: 9999px;
+    background: rgba(122, 158, 138, 0.12);
+  }
+
+  .cg-auth-left::after {
+    content: "";
+    position: absolute;
+    bottom: -5rem;
+    left: -4rem;
+    width: 16rem;
+    height: 16rem;
+    border-radius: 9999px;
+    background: rgba(212, 147, 90, 0.08);
+  }
+
+  .cg-form-card {
+    border: 1px solid rgba(82, 122, 104, 0.1);
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 24px 60px rgba(29, 78, 75, 0.08);
+  }
+
+  .cg-topbar {
+    background: linear-gradient(180deg, #123432 0%, #0f2e2c 100%);
+    color: #f9f5ee;
+    box-shadow: 0 10px 32px rgba(15, 46, 44, 0.18);
+  }
+
+  .cg-shell {
+    min-height: calc(100vh - 4.5rem);
+    background: transparent;
+  }
+
+  .cg-sidebar-card {
+    background: linear-gradient(180deg, rgba(18, 52, 50, 0.98) 0%, rgba(15, 46, 44, 0.98) 100%);
+    color: #f9f5ee;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 18px 40px rgba(15, 46, 44, 0.16);
+  }
+
+  .cg-nav-pill {
+    border: 1px solid rgba(82, 122, 104, 0.12);
+    background: rgba(255, 255, 255, 0.6);
+  }
+
+  .cg-nav-pill-active {
+    background: #1d4e4b;
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 10px 24px rgba(29, 78, 75, 0.18);
+  }
+
+  .cg-stat {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(247, 242, 234, 0.88) 100%);
+    border: 1px solid rgba(82, 122, 104, 0.1);
+  }
+
+  .cg-soft-raise {
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  }
+
+  .cg-soft-raise:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 32px rgba(29, 78, 75, 0.08);
+    border-color: rgba(82, 122, 104, 0.18);
+  }
+
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
   }
 }

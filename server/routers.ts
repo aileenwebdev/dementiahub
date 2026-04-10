@@ -1,7 +1,14 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
+import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { ENV } from "./_core/env";
+import { hashPassword, sdk, verifyPassword } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import * as db from "./db";
+import { aiRouter } from "./routers/ai";
 import { callsRouter } from "./routers/calls";
 import { ghlRouter } from "./routers/ghl";
 import { identityRouter } from "./routers/identity";
@@ -13,16 +20,77 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
 
+    register: publicProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          email: z.string().email(),
+          password: z.string().min(8),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getUserByEmail(input.email);
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
+        }
+
+        const openId = nanoid();
+        const passwordHash = await hashPassword(input.password);
+        const isAdmin =
+          ENV.adminEmail && ENV.adminEmail.toLowerCase() === input.email.toLowerCase();
+
+        await db.upsertUser({
+          openId,
+          name: input.name,
+          email: input.email,
+          passwordHash,
+          loginMethod: "email",
+          lastSignedIn: new Date(),
+          role: isAdmin ? "admin" : "user",
+        });
+
+        const token = await sdk.createSessionToken(openId, {
+          name: input.name,
+          expiresInMs: ONE_YEAR_MS,
+        });
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...getSessionCookieOptions(ctx.req),
+          maxAge: ONE_YEAR_MS,
+        });
+
+        return { success: true } as const;
+      }),
+
+    login: publicProcedure
+      .input(z.object({ email: z.string().email(), password: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await db.getUserByEmail(input.email);
+        const invalid = !user || !user.passwordHash;
+        const passwordOk = invalid ? false : await verifyPassword(input.password, user!.passwordHash!);
+
+        if (!passwordOk) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+        }
+
+        const token = await sdk.createSessionToken(user!.openId, {
+          name: user!.name ?? "",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...getSessionCookieOptions(ctx.req),
+          maxAge: ONE_YEAR_MS,
+        });
+
+        await db.upsertUser({ openId: user!.openId, lastSignedIn: new Date() });
+        return { success: true } as const;
+      }),
+
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
 
-    /**
-     * Called after OAuth login to ensure GHL identity is set up.
-     * Non-blocking — won't fail login if GHL is unavailable.
-     */
     postLoginSync: protectedProcedure.mutation(async ({ ctx }) => {
       try {
         await ensureGHLIdentity({
@@ -39,6 +107,7 @@ export const appRouter = router({
   }),
 
   calls: callsRouter,
+  ai: aiRouter,
   identity: identityRouter,
   ghl: ghlRouter,
 });
