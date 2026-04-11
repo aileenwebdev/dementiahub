@@ -13,7 +13,14 @@ export const config = {
   elevenLabsAgentId: process.env.ELEVENLABS_AGENT_ID ?? "",
 
   // Webhook secrets (for verifying inbound webhook authenticity)
-  elevenLabsWebhookSecret: process.env.ELEVENLABS_WEBHOOK_SECRET ?? "dementiahub-webhook-secret-2026",
+  elevenLabsPostCallWebhookSecret:
+    process.env.ELEVENLABS_POSTCALL_WEBHOOK_SECRET ??
+    process.env.ELEVENLABS_WEBHOOK_SECRET ??
+    "dementiahub-webhook-secret-2026",
+  elevenLabsConsentWebhookSecret:
+    process.env.ELEVENLABS_CONSENT_WEBHOOK_SECRET ??
+    process.env.ELEVENLABS_WEBHOOK_SECRET ??
+    "dementiahub-webhook-secret-2026",
 
   // App
   appUrl: process.env.APP_URL ?? "http://localhost:3000",
@@ -24,10 +31,16 @@ export const config = {
  * ElevenLabs sends the secret in the X-ElevenLabs-Secret header.
  */
 export function verifyElevenLabsWebhookSecret(
+  kind: "post_call" | "consent",
   incomingSecret: string | undefined
 ): boolean {
   if (!incomingSecret) return false;
-  return incomingSecret === config.elevenLabsWebhookSecret;
+  return (
+    incomingSecret ===
+    (kind === "post_call"
+      ? config.elevenLabsPostCallWebhookSecret
+      : config.elevenLabsConsentWebhookSecret)
+  );
 }
 
 /**

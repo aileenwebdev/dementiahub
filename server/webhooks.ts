@@ -33,9 +33,16 @@ function timingSafeEqualHex(expected: string, actual: string) {
   return crypto.timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
-function verifyElevenLabsSignature(req: RequestWithRawBody) {
+function getWebhookSecret(kind: "post_call" | "consent") {
+  return kind === "post_call"
+    ? config.elevenLabsPostCallWebhookSecret
+    : config.elevenLabsConsentWebhookSecret;
+}
+
+function verifyElevenLabsSignature(kind: "post_call" | "consent", req: RequestWithRawBody) {
   const signatureHeader = req.headers["elevenlabs-signature"];
-  if (typeof signatureHeader !== "string" || !req.rawBody || !config.elevenLabsWebhookSecret) {
+  const secret = getWebhookSecret(kind);
+  if (typeof signatureHeader !== "string" || !req.rawBody || !secret) {
     return false;
   }
 
@@ -62,20 +69,20 @@ function verifyElevenLabsSignature(req: RequestWithRawBody) {
   }
 
   const expected = crypto
-    .createHmac("sha256", config.elevenLabsWebhookSecret)
+    .createHmac("sha256", secret)
     .update(`${timestamp}.${req.rawBody}`)
     .digest("hex");
 
   return timingSafeEqualHex(expected, signature);
 }
 
-function isAuthorizedWebhook(req: RequestWithRawBody) {
+function isAuthorizedWebhook(kind: "post_call" | "consent", req: RequestWithRawBody) {
   const incomingSecret = req.headers["x-elevenlabs-secret"];
-  if (typeof incomingSecret === "string" && verifyElevenLabsWebhookSecret(incomingSecret)) {
+  if (typeof incomingSecret === "string" && verifyElevenLabsWebhookSecret(kind, incomingSecret)) {
     return true;
   }
 
-  return verifyElevenLabsSignature(req);
+  return verifyElevenLabsSignature(kind, req);
 }
 
 function unwrapWebhookPayload(payload: any) {
@@ -89,7 +96,7 @@ function unwrapWebhookPayload(payload: any) {
 webhookRouter.post("/elevenlabs/post-call", async (req, res) => {
   const request = req as typeof req & { rawBody?: string };
 
-  if (!isAuthorizedWebhook(request)) {
+  if (!isAuthorizedWebhook("post_call", request)) {
     console.error("[Webhook] post-call auth failed - invalid secret or signature");
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -127,7 +134,7 @@ webhookRouter.post("/elevenlabs/post-call", async (req, res) => {
 webhookRouter.post("/elevenlabs/consent", async (req, res) => {
   const request = req as typeof req & { rawBody?: string };
 
-  if (!isAuthorizedWebhook(request)) {
+  if (!isAuthorizedWebhook("consent", request)) {
     console.error("[Webhook] consent auth failed - invalid secret or signature");
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -183,7 +190,10 @@ webhookRouter.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    webhookSecret: config.elevenLabsWebhookSecret ? "configured" : "missing",
+    webhookSecrets: {
+      postCall: config.elevenLabsPostCallWebhookSecret ? "configured" : "missing",
+      consent: config.elevenLabsConsentWebhookSecret ? "configured" : "missing",
+    },
     ghl: config.ghlApiKey ? "configured" : "missing",
     elevenlabs: config.elevenLabsApiKey ? "configured" : "missing",
   });

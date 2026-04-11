@@ -103,7 +103,10 @@ export const adminRouter = router({
         postCall: `${config.appUrl}/api/webhooks/elevenlabs/post-call`,
         consent: `${config.appUrl}/api/webhooks/elevenlabs/consent`,
         health: `${config.appUrl}/api/webhooks/health`,
-        secretConfigured: Boolean(config.elevenLabsWebhookSecret),
+        secretConfigured: {
+          postCall: Boolean(config.elevenLabsPostCallWebhookSecret),
+          consent: Boolean(config.elevenLabsConsentWebhookSecret),
+        },
       },
       failedSyncs,
     };

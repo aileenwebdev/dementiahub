@@ -54,15 +54,16 @@ describe("verifyElevenLabsWebhookSecret", () => {
     // The config module reads env at import time and falls back to a default.
     // We test against the actual configured secret value.
     const defaultSecret = "dementiahub-webhook-secret-2026";
-    expect(verifyElevenLabsWebhookSecret(defaultSecret)).toBe(true);
+    expect(verifyElevenLabsWebhookSecret("post_call", defaultSecret)).toBe(true);
+    expect(verifyElevenLabsWebhookSecret("consent", defaultSecret)).toBe(true);
   });
 
   it("returns false when secret does not match", () => {
-    expect(verifyElevenLabsWebhookSecret("wrong-secret")).toBe(false);
+    expect(verifyElevenLabsWebhookSecret("post_call", "wrong-secret")).toBe(false);
   });
 
   it("returns false when no secret is provided", () => {
-    expect(verifyElevenLabsWebhookSecret(undefined)).toBe(false);
+    expect(verifyElevenLabsWebhookSecret("consent", undefined)).toBe(false);
   });
 });
 

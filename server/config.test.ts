@@ -19,18 +19,24 @@ describe("config", () => {
     expect(typeof config.elevenLabsAgentId).toBe("string");
   });
 
-  it("should have a webhook secret set", () => {
-    expect(config.elevenLabsWebhookSecret.length).toBeGreaterThan(0);
+  it("should have webhook secrets set", () => {
+    expect(config.elevenLabsPostCallWebhookSecret.length).toBeGreaterThan(0);
+    expect(config.elevenLabsConsentWebhookSecret.length).toBeGreaterThan(0);
   });
 
-  it("verifyElevenLabsWebhookSecret returns true for matching secret", () => {
-    const result = verifyElevenLabsWebhookSecret(config.elevenLabsWebhookSecret);
+  it("verifyElevenLabsWebhookSecret returns true for matching post-call secret", () => {
+    const result = verifyElevenLabsWebhookSecret("post_call", config.elevenLabsPostCallWebhookSecret);
+    expect(result).toBe(true);
+  });
+
+  it("verifyElevenLabsWebhookSecret returns true for matching consent secret", () => {
+    const result = verifyElevenLabsWebhookSecret("consent", config.elevenLabsConsentWebhookSecret);
     expect(result).toBe(true);
   });
 
   it("verifyElevenLabsWebhookSecret returns false for wrong secret", () => {
-    expect(verifyElevenLabsWebhookSecret("wrong-secret")).toBe(false);
-    expect(verifyElevenLabsWebhookSecret(undefined)).toBe(false);
+    expect(verifyElevenLabsWebhookSecret("post_call", "wrong-secret")).toBe(false);
+    expect(verifyElevenLabsWebhookSecret("consent", undefined)).toBe(false);
   });
 
   it("isGHLConfigured returns boolean", () => {
