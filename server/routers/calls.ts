@@ -183,9 +183,10 @@ export const callsRouter = router({
           wibiz_contact_id: identity?.ghlContactId ?? "",
           wibiz_location_id: identity?.ghlLocationId ?? config.ghlLocationId,
           caregiver_language: identity?.preferredLanguage ?? "en",
+          session_id: input.sessionId,
           portal_call_session_id: input.sessionId,
         },
-        contextualMemory: toBrowserCallContext({
+        overridePrompt: toBrowserCallContext({
           user: {
             id: ctx.user.id,
             name: ctx.user.name,
@@ -194,6 +195,7 @@ export const callsRouter = router({
           },
           identity,
         }),
+        overrideFirstMessage: `Hi ${ctx.user.name?.trim().split(/\s+/)[0] ?? "Caregiver"}, you've reached DementiaHub Support. I already have your portal details on file, so we can go straight to helping you. If someone is in immediate danger right now, please hang up and call 995. Otherwise, what's happening today?`,
       };
     }),
 

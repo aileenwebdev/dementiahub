@@ -5,12 +5,11 @@
  */
 
 import {
-  addNoteToConversation,
+  addNoteToContact,
   addTagsToContact,
   buildSOAPNote,
   createOpportunity,
   extractCaregiversPipeline,
-  getConversationsForContact,
   getOpportunitiesForContact,
   getPipelines,
   resolveTargetStageName,
@@ -23,9 +22,13 @@ import {
   getConversation,
 } from "./elevenlabs";
 import {
+  getCallSessionBySessionId,
   getCallSessionByConversationId,
+  getTranscriptsBySessionId,
   getIdentityByGhlContactId,
+  insertTranscriptChunk,
   queueFailedSync,
+  updateCallSession,
   updateCallSessionByConversationId,
 } from "../db";
 import { config } from "../config";
@@ -46,6 +49,7 @@ export interface PostCallPayload {
       ghl_contact_id?: string;
       ghl_location_id?: string;
       session_id?: string;
+      portal_call_session_id?: string;
       portal_user_id?: string;
     };
   };
@@ -93,6 +97,8 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
     throw new Error("Missing conversation_id in webhook payload");
   }
 
+  let conversationData = null as Awaited<ReturnType<typeof getConversation>> | null;
+
   // Resolve GHL contact ID from multiple sources
   let ghlContactId =
     rawPayload.ghl_write_targets?.contact_id ??
@@ -105,20 +111,23 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
     rawPayload.dynamic_variables?.ghl_location_id ??
     config.ghlLocationId;
 
+  if (config.elevenLabsApiKey) {
+    conversationData = await getConversation(config.elevenLabsApiKey, conversationId);
+  }
+
   // Fallback: fetch full conversation from ElevenLabs to get dynamic_variables
-  if (!ghlContactId && config.elevenLabsApiKey) {
-    const convData = await getConversation(config.elevenLabsApiKey, conversationId);
-    if (convData?.dynamic_variables?.ghl_contact_id) {
-      ghlContactId = convData.dynamic_variables.ghl_contact_id;
+  if (!ghlContactId && conversationData) {
+    if (conversationData.dynamic_variables?.ghl_contact_id) {
+      ghlContactId = conversationData.dynamic_variables.ghl_contact_id;
     }
 
     // Last resort: phone-based lookup (inbound calls)
-    if (!ghlContactId && convData?.caller_phone && config.ghlApiKey) {
+    if (!ghlContactId && conversationData.caller_phone && config.ghlApiKey) {
       const { searchContactByPhone } = await import("./ghl");
       const contact = await searchContactByPhone(
         config.ghlApiKey,
         ghlLocationId,
-        convData.caller_phone
+        conversationData.caller_phone
       );
       if (contact) ghlContactId = contact.id;
     }
@@ -128,13 +137,23 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
     throw new Error(`Cannot resolve GHL contact for conversation ${conversationId}`);
   }
 
+  const portalCallSessionId =
+    rawPayload.elevenlabs?.dynamic_variables_echo?.portal_call_session_id ??
+    rawPayload.dynamic_variables?.portal_call_session_id ??
+    rawPayload.elevenlabs?.dynamic_variables_echo?.session_id ??
+    rawPayload.dynamic_variables?.session_id ??
+    conversationData?.dynamic_variables?.portal_call_session_id ??
+    conversationData?.dynamic_variables?.session_id ??
+    null;
+
   // Build normalized payload
   const outcome = rawPayload.call_outcome ?? {} as NonNullable<PostCallPayload['call_outcome']>;
   const elevenlabsMeta = rawPayload.elevenlabs ?? {} as NonNullable<PostCallPayload['elevenlabs']>;
+  const transcriptEntries = rawPayload.transcript ?? conversationData?.transcript ?? [];
 
   const transcript =
     rawPayload.elevenlabs?.transcript_raw ??
-    (rawPayload.transcript ? formatTranscriptToText(rawPayload.transcript) : "") ??
+    (transcriptEntries.length ? formatTranscriptToText(transcriptEntries) : "") ??
     "";
 
   const normalizedPayload = {
@@ -161,11 +180,33 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
   // Write to GHL
   await syncToGHL(normalizedPayload);
 
-  // Update local DB session
-  await updateCallSessionByConversationId(conversationId, {
-    status: "synced",
+  const linkedSession =
+    (portalCallSessionId
+      ? await getCallSessionBySessionId(portalCallSessionId)
+      : null) ??
+    (await getCallSessionByConversationId(conversationId)) ??
+    null;
+
+  if (linkedSession?.sessionId && transcriptEntries.length > 0) {
+    const existingChunks = await getTranscriptsBySessionId(linkedSession.sessionId);
+    if (existingChunks.length === 0) {
+      for (const entry of transcriptEntries) {
+        await insertTranscriptChunk({
+          sessionId: linkedSession.sessionId,
+          elevenlabsConversationId: conversationId,
+          speaker: entry.role === "agent" ? "agent" : "user",
+          text: entry.message,
+          timestamp: normalizedPayload.callEndTime,
+        });
+      }
+    }
+  }
+
+  const dbUpdate = {
+    status: "synced" as const,
     ghlContactId,
     ghlLocationId,
+    elevenlabsConversationId: conversationId,
     safetyResult: normalizedPayload.safetyResult as any,
     safetyFlagType: normalizedPayload.safetyFlagType,
     topicClassified: normalizedPayload.topicClassified,
@@ -181,7 +222,13 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
     callEndTime: normalizedPayload.callEndTime,
     ghlSynced: true,
     ghlSyncedAt: new Date(),
-  });
+  };
+
+  if (linkedSession?.sessionId) {
+    await updateCallSession(linkedSession.sessionId, dbUpdate);
+  } else {
+    await updateCallSessionByConversationId(conversationId, dbUpdate);
+  }
 
   return conversationId;
 }
@@ -323,11 +370,9 @@ async function syncToGHL(payload: NormalizedCallPayload) {
     }
   }
 
-  // STEP 4: Add conversation note with transcript
+  // STEP 4: Add contact note with transcript
   try {
-    const conversations = await getConversationsForContact(config.ghlApiKey, ghlContactId);
-    const conversation = conversations[0];
-    if (conversation?.id) {
+    
       const noteBody = `☎ VOICE CALL SUMMARY — ${callEndTime.toISOString()}
 
 Duration: ${callDurationSeconds}s
@@ -341,8 +386,7 @@ ${callSummary}
 --- FULL TRANSCRIPT ---
 ${transcriptRaw}`;
 
-      await addNoteToConversation(config.ghlApiKey, conversation.id, noteBody);
-    }
+      await addNoteToContact(config.ghlApiKey, ghlContactId, noteBody);
   } catch (err) {
     console.error("[PostCallSync] Failed to add GHL note:", err);
   }

@@ -276,21 +276,41 @@ export async function addNoteToConversation(
   noteBody: string
 ): Promise<void> {
   const res = await fetch(
-    `${GHL_BASE_URL}/conversations/${conversationId}/messages`,
+    `${GHL_BASE_URL}/contacts/${conversationId}/notes`,
     {
       method: "POST",
       headers: ghlHeaders(apiKey),
-      body: JSON.stringify({ type: "Note", body: noteBody }),
+      body: JSON.stringify({ body: noteBody }),
     }
   );
   if (!res.ok) {
     const err = await res.text();
-    console.error(`GHL addNoteToConversation failed: ${res.status} ${err}`);
+    console.error(`GHL addNoteToContact failed: ${res.status} ${err}`);
     // Non-fatal — don't throw
   }
 }
 
 // ─── Stage Resolution Helpers ────────────────────────────────────────────────
+
+export async function addNoteToContact(
+  apiKey: string,
+  contactId: string,
+  noteBody: string
+): Promise<void> {
+  const res = await fetch(
+    `${GHL_BASE_URL}/contacts/${contactId}/notes`,
+    {
+      method: "POST",
+      headers: ghlHeaders(apiKey),
+      body: JSON.stringify({ body: noteBody }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    console.error(`GHL addNoteToContact failed: ${res.status} ${err}`);
+    // Non-fatal â€” don't throw
+  }
+}
 
 export function resolveTargetStageName(
   safetyResult: string,

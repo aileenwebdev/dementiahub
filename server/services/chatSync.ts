@@ -2,12 +2,11 @@ import type { AIChatConversation, AIChatMessage } from "../../drizzle/schema";
 import { config } from "../config";
 import { updateAIChatConversation } from "../db";
 import {
-  addNoteToConversation,
+  addNoteToContact,
   addTagsToContact,
   buildSOAPNote,
   createOpportunity,
   extractCaregiversPipeline,
-  getConversationsForContact,
   getOpportunitiesForContact,
   getPipelines,
   resolveTargetStageName,
@@ -130,10 +129,7 @@ export async function syncChatConversationToGHL(params: {
       });
     }
 
-    const conversations = await getConversationsForContact(config.ghlApiKey, ghlContactId);
-    const ghlConversation = conversations[0];
-    if (ghlConversation?.id) {
-      const noteBody = `PORTAL CHAT SUMMARY - ${new Date().toISOString()}
+    const noteBody = `PORTAL CHAT SUMMARY - ${new Date().toISOString()}
 
 Safety: ${triage.safetyResult}
 Topic: ${triage.topicClassified}
@@ -144,8 +140,7 @@ ${triage.conversationSummary}
 
 --- FULL TRANSCRIPT ---
 ${triage.transcriptRaw}`;
-      await addNoteToConversation(config.ghlApiKey, ghlConversation.id, noteBody);
-    }
+    await addNoteToContact(config.ghlApiKey, ghlContactId, noteBody);
 
     await updateAIChatConversation(conversation.id, {
       ghlSynced: true,
