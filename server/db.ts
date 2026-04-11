@@ -306,12 +306,35 @@ export async function createAIChatConversation(data: InsertAIChatConversation) {
   return result[0]?.id;
 }
 
+export async function getAIChatConversationsByUserId(portalUserId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(aiChatConversations)
+    .where(eq(aiChatConversations.portalUserId, portalUserId))
+    .orderBy(desc(aiChatConversations.updatedAt))
+    .limit(limit);
+}
+
 export async function touchAIChatConversation(conversationId: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
   await db
     .update(aiChatConversations)
     .set({ lastMessageAt: new Date() })
+    .where(eq(aiChatConversations.id, conversationId));
+}
+
+export async function updateAIChatConversation(
+  conversationId: number,
+  updates: Partial<InsertAIChatConversation>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(aiChatConversations)
+    .set(updates)
     .where(eq(aiChatConversations.id, conversationId));
 }
 

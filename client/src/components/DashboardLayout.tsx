@@ -12,7 +12,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: MessageSquare, label: "AI Assistant", path: "/assistant" },
   { icon: Phone, label: "Start a Call", path: "/call" },
-  { icon: History, label: "Call History", path: "/history" },
+  { icon: History, label: "Conversation History", path: "/history" },
   { icon: User, label: "My Profile", path: "/profile" },
 ];
 
@@ -97,7 +97,10 @@ export default function DashboardLayout({
       <div className="mx-auto max-w-[1440px] px-4 pb-8 pt-6 sm:px-6 lg:px-8">
         <nav className="mb-6 flex flex-wrap gap-2">
           {visibleItems.map((item) => {
-            const active = location === item.path;
+            const active =
+              item.path === "/"
+                ? location === item.path
+                : location === item.path || location.startsWith(`${item.path}/`);
             return (
               <button
                 key={item.path}

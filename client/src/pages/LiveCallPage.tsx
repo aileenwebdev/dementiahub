@@ -32,6 +32,7 @@ export default function LiveCallPage() {
   const sessionId = params.sessionId;
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<VoiceConversation | null>(null);
+  const startedSessionKeyRef = useRef<string | null>(null);
   const boundConversationIdRef = useRef<string | null>(null);
   const seenEventIdsRef = useRef<Set<string>>(new Set());
 
@@ -93,6 +94,9 @@ export default function LiveCallPage() {
     if (!sessionId || !session?.signedUrl || conversationRef.current) {
       return;
     }
+    if (startedSessionKeyRef.current === session.signedUrl) {
+      return;
+    }
 
     let cancelled = false;
 
@@ -100,6 +104,7 @@ export default function LiveCallPage() {
       try {
         setBooting(true);
         setError(null);
+        startedSessionKeyRef.current = session.signedUrl;
 
         const conversation = await VoiceConversation.startSession({
           signedUrl: session.signedUrl,
@@ -169,6 +174,7 @@ export default function LiveCallPage() {
         if (!cancelled) {
           setStatus("disconnected");
           setError(err instanceof Error ? err.message : "Failed to start browser voice call");
+          startedSessionKeyRef.current = null;
         }
       } finally {
         if (!cancelled) {
@@ -181,15 +187,21 @@ export default function LiveCallPage() {
 
     return () => {
       cancelled = true;
+    };
+  }, [bindConversation, sessionId, sessionQuery.data]);
+
+  useEffect(() => {
+    return () => {
       const activeConversation = conversationRef.current;
       conversationRef.current = null;
+      startedSessionKeyRef.current = null;
       boundConversationIdRef.current = null;
       seenEventIdsRef.current.clear();
       if (activeConversation) {
         void activeConversation.endSession();
       }
     };
-  }, [bindConversation, sessionId, sessionQuery.data]);
+  }, []);
 
   const handleEndCall = async () => {
     const activeConversation = conversationRef.current;

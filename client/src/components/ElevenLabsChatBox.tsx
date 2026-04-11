@@ -31,13 +31,14 @@ export function ElevenLabsChatBox({
   const [streamingReply, setStreamingReply] = useState("");
 
   const conversationRef = useRef<TextConversation | null>(null);
+  const startedSessionKeyRef = useRef<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const appendPortalMessageRef = useRef<ReturnType<typeof trpc.ai.appendPortalMessage.useMutation> | null>(null);
-  const startedSessionRef = useRef<string | null>(null);
   const seenMessageEventsRef = useRef<Set<string>>(new Set());
   const hasSeededInitialMessagesRef = useRef(false);
   const pendingUserMessagesRef = useRef<string[]>([]);
   const appendPortalMessage = trpc.ai.appendPortalMessage.useMutation();
+  const bindElevenLabsConversation = trpc.ai.bindElevenLabsConversation.useMutation();
   const sessionQuery = trpc.ai.getElevenLabsSession.useQuery(undefined, {
     retry: 1,
     staleTime: 1000 * 60 * 10,
@@ -87,7 +88,7 @@ export function ElevenLabsChatBox({
       return;
     }
 
-    if (startedSessionRef.current === session.signedUrl) {
+    if (startedSessionKeyRef.current === session.signedUrl) {
       return;
     }
 
@@ -98,6 +99,7 @@ export function ElevenLabsChatBox({
       try {
         setIsBooting(true);
         setError(null);
+        startedSessionKeyRef.current = session.signedUrl;
         connectionTimeout = setTimeout(() => {
           if (!cancelled && !conversationRef.current) {
             setIsBooting(false);
@@ -194,8 +196,14 @@ export function ElevenLabsChatBox({
           connectionTimeout = null;
         }
 
-        startedSessionRef.current = session.signedUrl;
         conversationRef.current = conversation;
+        const elevenlabsConversationId = conversation.getId();
+        if (elevenlabsConversationId) {
+          void bindElevenLabsConversation.mutateAsync({
+            conversationId: session.conversationId,
+            elevenlabsConversationId,
+          });
+        }
         if (session.contextualMemory) {
           conversation.sendContextualUpdate(session.contextualMemory);
         }
@@ -207,7 +215,7 @@ export function ElevenLabsChatBox({
         if (!cancelled) {
           setStatus("disconnected");
           setError(err instanceof Error ? err.message : "Failed to start ElevenLabs chat");
-          startedSessionRef.current = null;
+          startedSessionKeyRef.current = null;
         }
       } finally {
         if (!cancelled) {
@@ -223,16 +231,21 @@ export function ElevenLabsChatBox({
       if (connectionTimeout) {
         clearTimeout(connectionTimeout);
       }
+    };
+  }, [sessionQuery.data, sessionQuery.error]);
+
+  useEffect(() => {
+    return () => {
       const activeConversation = conversationRef.current;
       conversationRef.current = null;
-      startedSessionRef.current = null;
+      startedSessionKeyRef.current = null;
       seenMessageEventsRef.current.clear();
       pendingUserMessagesRef.current = [];
       if (activeConversation) {
         void activeConversation.endSession();
       }
     };
-  }, [sessionQuery.data, sessionQuery.error]);
+  }, []);
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -254,7 +267,7 @@ export function ElevenLabsChatBox({
   const handleReconnect = async () => {
     const activeConversation = conversationRef.current;
     conversationRef.current = null;
-    startedSessionRef.current = null;
+    startedSessionKeyRef.current = null;
     seenMessageEventsRef.current.clear();
     pendingUserMessagesRef.current = [];
     if (activeConversation) {

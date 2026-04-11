@@ -3,10 +3,10 @@ import { ElevenLabsChatBox } from "@/components/ElevenLabsChatBox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Brain, Link2, MessagesSquare, UserRound } from "lucide-react";
+import { Brain, MessagesSquare, Shield, UserRound } from "lucide-react";
 
 export default function AssistantPage() {
-  const { data, isLoading } = trpc.ai.getMyConversation.useQuery(undefined, {
+  const { data } = trpc.ai.getMyConversation.useQuery(undefined, {
     staleTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -57,6 +57,24 @@ export default function AssistantPage() {
       <div className="rounded-[1.25rem] border border-white/10 bg-white/6 p-5 text-sm leading-6 text-white/68">
         The assistant uses the logged-in caregiver profile from this portal session and reloads saved history each time the same user comes back.
       </div>
+
+      <p className="mb-4 mt-6 text-[11px] uppercase tracking-[0.18em] text-white/32">Case Triage</p>
+      <div className="rounded-[1.25rem] border border-white/10 bg-white/6 p-5 text-sm leading-6 text-white/68">
+        <div className="flex items-center justify-between">
+          <span>Safety</span>
+          <Badge className="bg-[#7a9e8a]/18 text-[#edb27e] hover:bg-[#7a9e8a]/18">
+            {data?.conversation.safetyResult ?? "Pending"}
+          </Badge>
+        </div>
+        <div className="mt-3 flex items-center justify-between">
+          <span>Topic</span>
+          <span className="text-white/84">{data?.conversation.topicClassified ?? "general"}</span>
+        </div>
+        <div className="mt-3 flex items-center justify-between">
+          <span>GHL Sync</span>
+          <span className="text-white/84">{data?.conversation.ghlSynced ? "Synced" : "Pending"}</span>
+        </div>
+      </div>
     </div>
   );
 
@@ -94,9 +112,9 @@ export default function AssistantPage() {
               text: "User and assistant messages are mirrored into the portal and reloaded on return.",
             },
             {
-              icon: Link2,
-              title: "Portal linkage",
-              text: "Wibiz contact linkage and caregiver context stay attached to the same account.",
+              icon: Shield,
+              title: "Auto triage",
+              text: "Chat sessions are classified for safety and escalation so they can flow into your case records too.",
             },
           ].map((item) => (
             <div key={item.title} className="cg-stat rounded-[1.5rem] p-5">

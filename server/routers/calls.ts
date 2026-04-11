@@ -17,6 +17,7 @@ import {
   getSignedConversationUrl,
   initiateOutboundCall,
 } from "../services/elevenlabs";
+import { triageConversation } from "../services/conversationTriage";
 
 function toBrowserCallContext(params: {
   user: {
@@ -34,9 +35,11 @@ function toBrowserCallContext(params: {
   };
 }) {
   const { user, identity } = params;
+  const firstName = user.name?.trim().split(/\s+/)[0] ?? "Caregiver";
   return [
     "You are the live DementiaHub caregiver voice assistant inside the portal.",
     "Use the logged-in caregiver profile below as the source of truth.",
+    `If you greet the caregiver at the beginning, greet them by name as ${firstName} and show that you already know their profile from the portal.`,
     `Portal user ID: ${user.id}`,
     `Open ID: ${user.openId}`,
     `Name: ${user.name ?? "Not provided"}`,
@@ -424,6 +427,12 @@ export const callsRouter = router({
       const transcriptRaw = transcriptChunks
         .map((chunk) => `[${chunk.speaker.toUpperCase()}]: ${chunk.text}`)
         .join("\n");
+      const triage = triageConversation(
+        transcriptChunks.map((chunk) => ({
+          role: chunk.speaker === "agent" ? "assistant" : "user",
+          content: chunk.text,
+        }))
+      );
       const endTime = new Date();
       const startedAt = session.callStartTime ? new Date(session.callStartTime).getTime() : Date.now();
       const durationSeconds = Math.max(1, Math.round((endTime.getTime() - startedAt) / 1000));
@@ -432,11 +441,17 @@ export const callsRouter = router({
         status: "completed",
         callEndTime: endTime,
         callDurationSeconds: durationSeconds,
-        transcriptRaw,
+        transcriptRaw: triage.transcriptRaw || transcriptRaw,
         callSummary: transcriptChunks.length
-          ? "Browser voice conversation completed and saved to portal history."
+          ? triage.conversationSummary
           : "Browser voice conversation ended with no transcript captured.",
-        resolutionType: "browser_voice_demo",
+        topicClassified: transcriptChunks.length ? triage.topicClassified : "general",
+        safetyResult: transcriptChunks.length ? triage.safetyResult : "SAFE",
+        safetyFlagType: transcriptChunks.length ? triage.safetyFlagType : "none",
+        callbackRequested: triage.callbackRequested,
+        consentVerballyConfirmed: triage.consentVerballyConfirmed,
+        resolutionType: transcriptChunks.length ? triage.resolutionType : "browser_voice_demo",
+        escalationTriggered: triage.escalationTriggered,
       });
 
       return { success: true } as const;

@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import AssistantPage from "./pages/AssistantPage";
 import AdminConversationsPage from "./pages/AdminConversationsPage";
 import AdminIntegrationPage from "./pages/AdminIntegrationPage";
+import ChatConversationDetailsPage from "./pages/ChatConversationDetailsPage";
 import Home from "./pages/Home";
 import CallPage from "./pages/CallPage";
 import CallHistoryPage from "./pages/CallHistoryPage";
@@ -29,6 +30,7 @@ function Router() {
       <Route path={"/call/:sessionId"} component={CallDetailsPage} />
       <Route path={"/call/:sessionId/live"} component={LiveCallPage} />
       <Route path={"/history"} component={CallHistoryPage} />
+      <Route path={"/history/chat/:conversationId"} component={ChatConversationDetailsPage} />
       <Route path={"/profile"} component={ProfilePage} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

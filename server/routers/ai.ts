@@ -7,12 +7,16 @@ import {
   createAIChatMessage,
   getActiveAIChatConversationByUserId,
   getAIChatConversationById,
+  getAIChatConversationsByUserId,
   getAIChatMessagesByConversationId,
   getIdentityByUserId,
   touchAIChatConversation,
+  updateAIChatConversation,
 } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getSignedConversationUrl } from "../services/elevenlabs";
+import { triageConversation } from "../services/conversationTriage";
+import { syncChatConversationToGHL } from "../services/chatSync";
 
 const CAREGIVER_SYSTEM_PROMPT = `You are DementiaHub's caregiver support assistant inside the caregiver portal.
 
@@ -130,6 +134,7 @@ function toElevenLabsContextualUpdate(params: {
   }>;
 }) {
   const { user, identity, history } = params;
+  const firstName = user.name?.trim().split(/\s+/)[0] ?? "Caregiver";
   const historyBlock = history
     .filter((message) => message.role !== "system")
     .slice(-12)
@@ -138,6 +143,8 @@ function toElevenLabsContextualUpdate(params: {
 
   return [
     "Use this caregiver profile as the source of truth for this portal session.",
+    `When you greet the caregiver, greet them by name as ${firstName} and acknowledge that their portal details are already on file.`,
+    "Keep that greeting natural and only do it once at the start of a fresh session.",
     `Portal user ID: ${user.id}`,
     `Open ID: ${user.openId}`,
     `Name: ${user.name ?? "Not provided"}`,
@@ -175,13 +182,79 @@ async function ensureConversationForUser(portalUserId: number) {
   return created;
 }
 
+async function refreshConversationTriage(params: {
+  conversationId: number;
+  portalUserId: number;
+  identity?: Awaited<ReturnType<typeof getIdentityByUserId>>;
+}) {
+  const { conversationId, portalUserId } = params;
+  const conversation = await getAIChatConversationById(conversationId);
+  if (!conversation || conversation.portalUserId !== portalUserId) {
+    return null;
+  }
+
+  const messages = await getAIChatMessagesByConversationId(conversationId, 200);
+  const triage = triageConversation(
+    messages
+      .filter((message) => message.role === "user" || message.role === "assistant")
+      .map((message) => ({
+        role: message.role as "user" | "assistant",
+        content: message.content,
+      }))
+  );
+
+  await updateAIChatConversation(conversationId, {
+    title:
+      triage.topicClassified === "general"
+        ? conversation.title ?? "Caregiver Support Chat"
+        : triage.topicClassified
+            .split("_")
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(" "),
+    safetyResult: triage.safetyResult,
+    safetyFlagType: triage.safetyFlagType === "none" ? null : triage.safetyFlagType,
+    topicClassified: triage.topicClassified,
+    callbackRequested: triage.callbackRequested,
+    consentVerballyConfirmed: triage.consentVerballyConfirmed,
+    conversationSummary: triage.conversationSummary,
+    resolutionType: triage.resolutionType,
+    escalationTriggered: triage.escalationTriggered,
+    ghlSyncError: null,
+  });
+
+  const refreshedConversation = await getAIChatConversationById(conversationId);
+  if (refreshedConversation) {
+    await syncChatConversationToGHL({
+      conversation: refreshedConversation,
+      messages,
+      triage,
+      identity: params.identity,
+    });
+  }
+
+  return {
+    conversation: refreshedConversation,
+    messages,
+    triage,
+  };
+}
+
 export const aiRouter = router({
   getMyConversation: protectedProcedure.query(async ({ ctx }) => {
     const conversation = await ensureConversationForUser(ctx.user.id);
-    const messages = await getAIChatMessagesByConversationId(conversation.id);
+    const identity = await getIdentityByUserId(ctx.user.id);
+    const refreshed =
+      conversation.safetyResult || conversation.topicClassified
+        ? null
+        : await refreshConversationTriage({
+            conversationId: conversation.id,
+            portalUserId: ctx.user.id,
+            identity,
+          });
+    const messages = refreshed?.messages ?? (await getAIChatMessagesByConversationId(conversation.id));
 
     return {
-      conversation,
+      conversation: refreshed?.conversation ?? conversation,
       messages,
     };
   }),
@@ -233,6 +306,67 @@ export const aiRouter = router({
     };
   }),
 
+  bindElevenLabsConversation: protectedProcedure
+    .input(
+      z.object({
+        conversationId: z.number().int().positive(),
+        elevenlabsConversationId: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await getAIChatConversationById(input.conversationId);
+      if (!conversation || conversation.portalUserId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Conversation not found for current user" });
+      }
+
+      await updateAIChatConversation(input.conversationId, {
+        elevenlabsConversationId: input.elevenlabsConversationId,
+      });
+
+      return { success: true } as const;
+    }),
+
+  getConversationHistory: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(50),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const conversations = await getAIChatConversationsByUserId(ctx.user.id, input?.limit ?? 50);
+
+      return Promise.all(
+        conversations.map(async (conversation) => {
+          const messages = await getAIChatMessagesByConversationId(conversation.id, 1);
+          return {
+            ...conversation,
+            lastMessagePreview: messages.at(-1)?.content ?? null,
+            messageCount: (await getAIChatMessagesByConversationId(conversation.id, 500)).length,
+          };
+        })
+      );
+    }),
+
+  getConversationDetails: protectedProcedure
+    .input(z.object({ conversationId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const conversation = await getAIChatConversationById(input.conversationId);
+      if (!conversation || conversation.portalUserId !== ctx.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Chat conversation not found" });
+      }
+
+      const identity = await getIdentityByUserId(ctx.user.id);
+      const refreshed = await refreshConversationTriage({
+        conversationId: conversation.id,
+        portalUserId: ctx.user.id,
+        identity,
+      });
+      return {
+        conversation: refreshed?.conversation ?? conversation,
+        messages: refreshed?.messages ?? (await getAIChatMessagesByConversationId(conversation.id, 200)),
+      };
+    }),
+
   appendPortalMessage: protectedProcedure
     .input(
       z.object({
@@ -257,6 +391,12 @@ export const aiRouter = router({
         content: input.content.trim(),
       });
       await touchAIChatConversation(conversation.id);
+      const identity = await getIdentityByUserId(ctx.user.id);
+      await refreshConversationTriage({
+        conversationId: conversation.id,
+        portalUserId: ctx.user.id,
+        identity,
+      });
 
       return { success: true, conversationId: conversation.id } as const;
     }),
@@ -336,8 +476,12 @@ export const aiRouter = router({
         content: reply,
       });
       await touchAIChatConversation(conversation.id);
-
-      const messages = await getAIChatMessagesByConversationId(conversation.id);
+      const refreshed = await refreshConversationTriage({
+        conversationId: conversation.id,
+        portalUserId: ctx.user.id,
+        identity,
+      });
+      const messages = refreshed?.messages ?? (await getAIChatMessagesByConversationId(conversation.id));
 
       return {
         conversationId: conversation.id,
