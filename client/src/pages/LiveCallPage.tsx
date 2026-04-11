@@ -41,6 +41,7 @@ export default function LiveCallPage() {
   const [booting, setBooting] = useState(false);
   const [muted, setMuted] = useState(false);
   const [transcript, setTranscript] = useState<BrowserChunk[]>([]);
+  const [readyToStart, setReadyToStart] = useState(false);
 
   const sessionQuery = trpc.calls.getBrowserCallSession.useQuery(
     { sessionId: sessionId ?? "" },
@@ -91,7 +92,7 @@ export default function LiveCallPage() {
 
   useEffect(() => {
     const session = sessionQuery.data;
-    if (!sessionId || !session?.signedUrl || conversationRef.current) {
+    if (!sessionId || !session?.signedUrl || conversationRef.current || !readyToStart) {
       return;
     }
     if (startedSessionKeyRef.current === session.signedUrl) {
@@ -106,59 +107,76 @@ export default function LiveCallPage() {
         setError(null);
         startedSessionKeyRef.current = session.signedUrl;
 
-        const conversation = await VoiceConversation.startSession({
-          signedUrl: session.signedUrl,
-          dynamicVariables: session.dynamicVariables,
-          userId: sessionId,
-          onStatusChange: ({ status: nextStatus }) => {
-            if (!cancelled) {
-              setStatus(nextStatus);
-            }
-          },
-          onConnect: () => {
-            if (!cancelled) {
-              setStatus("connected");
-              setError(null);
-            }
-          },
-          onDisconnect: (details) => {
-            if (!cancelled) {
-              setStatus("disconnected");
-              if (details.reason === "error") {
-                setError(details.message);
+        const preliminaryInput = await Promise.race([
+          navigator.mediaDevices.getUserMedia({ audio: true }),
+          new Promise<never>((_, reject) => {
+            window.setTimeout(() => {
+              reject(new Error("Microphone access timed out. Please allow microphone access and try again."));
+            }, 15000);
+          }),
+        ]);
+        preliminaryInput.getTracks().forEach((track) => track.stop());
+
+        const conversation = await Promise.race([
+          VoiceConversation.startSession({
+            signedUrl: session.signedUrl,
+            dynamicVariables: session.dynamicVariables,
+            userId: sessionId,
+            onStatusChange: ({ status: nextStatus }) => {
+              if (!cancelled) {
+                setStatus(nextStatus);
               }
-            }
-          },
-          onError: (message) => {
-            if (!cancelled) {
-              setError(message);
-            }
-          },
-          onMessage: ({ message, role, event_id }) => {
-            if (cancelled || !sessionId) return;
-            if (typeof event_id === "number") {
-              const dedupeKey = `${role}:${event_id}`;
-              if (seenEventIdsRef.current.has(dedupeKey)) return;
-              seenEventIdsRef.current.add(dedupeKey);
-            }
+            },
+            onConnect: () => {
+              if (!cancelled) {
+                setStatus("connected");
+                setError(null);
+              }
+            },
+            onDisconnect: (details) => {
+              if (!cancelled) {
+                setStatus("disconnected");
+                if (details.reason === "error") {
+                  setError(details.message);
+                }
+              }
+            },
+            onError: (message) => {
+              if (!cancelled) {
+                setError(message);
+              }
+            },
+            onMessage: ({ message, role, event_id }) => {
+              if (cancelled || !sessionId) return;
+              if (typeof event_id === "number") {
+                const dedupeKey = `${role}:${event_id}`;
+                if (seenEventIdsRef.current.has(dedupeKey)) return;
+                seenEventIdsRef.current.add(dedupeKey);
+              }
 
-            const speaker = role === "agent" ? "agent" : "user";
-            const nextChunk = {
-              speaker,
-              text: message,
-              timestamp: Date.now(),
-            } satisfies BrowserChunk;
+              const speaker = role === "agent" ? "agent" : "user";
+              const nextChunk = {
+                speaker,
+                text: message,
+                timestamp: Date.now(),
+              } satisfies BrowserChunk;
 
-            setTranscript((prev) => [...prev, nextChunk]);
-            appendTranscriptChunk.mutate({
-              sessionId,
-              conversationId: boundConversationIdRef.current ?? conversation.getId(),
-              speaker,
-              text: message,
-              timestamp: nextChunk.timestamp,
-            });
-          },
-        });
+              setTranscript((prev) => [...prev, nextChunk]);
+              appendTranscriptChunk.mutate({
+                sessionId,
+                conversationId: boundConversationIdRef.current ?? conversation.getId(),
+                speaker,
+                text: message,
+                timestamp: nextChunk.timestamp,
+              });
+            },
+          }),
+          new Promise<never>((_, reject) => {
+            window.setTimeout(() => {
+              reject(new Error("The live call session did not connect in time. Please try again."));
+            }, 20000);
+          }),
+        ]);
 
         if (cancelled) {
           await conversation.endSession();
@@ -173,8 +191,17 @@ export default function LiveCallPage() {
       } catch (err) {
         if (!cancelled) {
           setStatus("disconnected");
-          setError(err instanceof Error ? err.message : "Failed to start browser voice call");
+          const message =
+            err instanceof DOMException && err.name === "NotAllowedError"
+              ? "Microphone access was blocked. Please allow microphone access in the browser and try again."
+              : err instanceof DOMException && err.name === "NotFoundError"
+                ? "No microphone was detected. Please connect a microphone and try again."
+                : err instanceof Error
+                  ? err.message
+                  : "Failed to start browser voice call";
+          setError(message);
           startedSessionKeyRef.current = null;
+          setReadyToStart(false);
         }
       } finally {
         if (!cancelled) {
@@ -212,6 +239,11 @@ export default function LiveCallPage() {
     if (sessionId) {
       completeBrowserCall.mutate({ sessionId });
     }
+  };
+
+  const handleStartCall = () => {
+    setReadyToStart(true);
+    setError(null);
   };
 
   const toggleMute = () => {
@@ -300,6 +332,26 @@ export default function LiveCallPage() {
                 {muted ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
                 {muted ? "Unmute" : "Mute"}
               </Button>
+              {status !== "connected" ? (
+                <Button
+                  variant="outline"
+                  className="rounded-2xl"
+                  onClick={handleStartCall}
+                  disabled={booting || sessionQuery.isLoading}
+                >
+                  {booting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="mr-2 h-4 w-4" />
+                      Connect Mic
+                    </>
+                  )}
+                </Button>
+              ) : null}
               <Button
                 className="rounded-2xl bg-[#1d4e4b] hover:bg-[#0f2e2c]"
                 onClick={handleEndCall}
@@ -341,6 +393,22 @@ export default function LiveCallPage() {
                     <>
                       <Loader2 className="mb-3 h-8 w-8 animate-spin text-muted-foreground/40" />
                       <p className="text-sm text-muted-foreground">Connecting microphone and live agent...</p>
+                    </>
+                  ) : error ? (
+                    <>
+                      <MicOff className="mb-3 h-8 w-8 text-red-300" />
+                      <p className="text-sm text-muted-foreground">Microphone or agent connection needs attention.</p>
+                      <Button className="mt-4 rounded-full" onClick={handleStartCall}>
+                        Try Again
+                      </Button>
+                    </>
+                  ) : !readyToStart ? (
+                    <>
+                      <Mic className="mb-3 h-8 w-8 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">Press connect to allow the microphone and join the live call.</p>
+                      <Button className="mt-4 rounded-full" onClick={handleStartCall}>
+                        Connect Mic & Start Call
+                      </Button>
                     </>
                   ) : (
                     <>

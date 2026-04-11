@@ -37,6 +37,8 @@ export function ElevenLabsChatBox({
   const seenMessageEventsRef = useRef<Set<string>>(new Set());
   const hasSeededInitialMessagesRef = useRef(false);
   const pendingUserMessagesRef = useRef<string[]>([]);
+  const hasUserSentMessageThisSessionRef = useRef(false);
+  const messagesRef = useRef<StoredMessage[]>(initialMessages);
   const appendPortalMessage = trpc.ai.appendPortalMessage.useMutation();
   const bindElevenLabsConversation = trpc.ai.bindElevenLabsConversation.useMutation();
   const sessionQuery = trpc.ai.getElevenLabsSession.useQuery(undefined, {
@@ -53,8 +55,52 @@ export function ElevenLabsChatBox({
       return;
     }
     setMessages(initialMessages);
+    messagesRef.current = initialMessages;
     hasSeededInitialMessagesRef.current = true;
   }, [initialMessages]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const normalizeMessage = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[^\w\s]/g, "")
+      .trim();
+
+  const isLikelyOpeningGreeting = (value: string) => {
+    const normalized = normalizeMessage(value);
+    return (
+      normalized.includes("youve reached dementiahub support") ||
+      (normalized.includes("immediate danger") && normalized.includes("call 995")) ||
+      (normalized.startsWith("hi ") && normalized.includes("details on file")) ||
+      (normalized.startsWith("hello ") && normalized.includes("details on file"))
+    );
+  };
+
+  const shouldSuppressAssistantGreeting = (value: string) => {
+    if (hasUserSentMessageThisSessionRef.current) {
+      return false;
+    }
+    if (messagesRef.current.length === 0) {
+      return false;
+    }
+    if (!isLikelyOpeningGreeting(value)) {
+      return false;
+    }
+
+    const recentAssistantMessages = messagesRef.current
+      .filter((message) => message.role === "assistant")
+      .slice(-4);
+
+    if (recentAssistantMessages.some((message) => normalizeMessage(message.content) === normalizeMessage(value))) {
+      return true;
+    }
+
+    return recentAssistantMessages.some((message) => isLikelyOpeningGreeting(message.content));
+  };
 
   const scrollToBottom = () => {
     const viewport = scrollAreaRef.current?.querySelector(
@@ -176,6 +222,14 @@ export function ElevenLabsChatBox({
               }
             }
 
+            if (
+              nextMessage.role === "assistant" &&
+              shouldSuppressAssistantGreeting(nextMessage.content)
+            ) {
+              setStreamingReply("");
+              return;
+            }
+
             setMessages((prev) => [...prev, nextMessage]);
             setStreamingReply("");
             appendPortalMessageRef.current?.mutate({
@@ -241,6 +295,7 @@ export function ElevenLabsChatBox({
       startedSessionKeyRef.current = null;
       seenMessageEventsRef.current.clear();
       pendingUserMessagesRef.current = [];
+      hasUserSentMessageThisSessionRef.current = false;
       if (activeConversation) {
         void activeConversation.endSession();
       }
@@ -254,6 +309,7 @@ export function ElevenLabsChatBox({
     }
 
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+    hasUserSentMessageThisSessionRef.current = true;
     pendingUserMessagesRef.current.push(trimmed);
     appendPortalMessageRef.current?.mutate({
       conversationId: sessionQuery.data?.conversationId,
@@ -270,6 +326,7 @@ export function ElevenLabsChatBox({
     startedSessionKeyRef.current = null;
     seenMessageEventsRef.current.clear();
     pendingUserMessagesRef.current = [];
+    hasUserSentMessageThisSessionRef.current = false;
     if (activeConversation) {
       await activeConversation.endSession();
     }

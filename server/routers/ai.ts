@@ -135,6 +135,7 @@ function toElevenLabsContextualUpdate(params: {
 }) {
   const { user, identity, history } = params;
   const firstName = user.name?.trim().split(/\s+/)[0] ?? "Caregiver";
+  const hasHistory = history.some((message) => message.role !== "system");
   const historyBlock = history
     .filter((message) => message.role !== "system")
     .slice(-12)
@@ -144,7 +145,9 @@ function toElevenLabsContextualUpdate(params: {
   return [
     "Use this caregiver profile as the source of truth for this portal session.",
     `When you greet the caregiver, greet them by name as ${firstName} and acknowledge that their portal details are already on file.`,
-    "Keep that greeting natural and only do it once at the start of a fresh session.",
+    hasHistory
+      ? "This caregiver already has saved conversation history in the portal. Do not restart with a fresh welcome, repeated safety disclaimer, or repeated identity introduction. Continue naturally from the prior conversation."
+      : "Keep that greeting natural and only do it once at the start of a fresh session.",
     `Portal user ID: ${user.id}`,
     `Open ID: ${user.openId}`,
     `Name: ${user.name ?? "Not provided"}`,
@@ -155,6 +158,9 @@ function toElevenLabsContextualUpdate(params: {
     `Preferred language: ${identity?.preferredLanguage ?? "en"}`,
     `Consent given: ${identity?.consentGiven ? "yes" : "no"}`,
     "Continue naturally with the same caregiver and preserve continuity with this recent saved portal history when relevant.",
+    hasHistory
+      ? "Because there is already saved history below, your next reply should continue the thread instead of sending a fresh opening message."
+      : "If there is no saved history below, you may begin with a brief welcome and then help immediately.",
     historyBlock || "No prior saved portal messages.",
   ].join("\n");
 }
