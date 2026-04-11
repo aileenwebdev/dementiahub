@@ -13,7 +13,7 @@ import { aiRouter } from "./routers/ai";
 import { callsRouter } from "./routers/calls";
 import { ghlRouter } from "./routers/ghl";
 import { identityRouter } from "./routers/identity";
-import { ensureGHLIdentity } from "./services/identitySync";
+import { ensureGHLIdentity, recordPortalSignupConsent } from "./services/identitySync";
 
 export const appRouter = router({
   system: systemRouter,
@@ -58,6 +58,18 @@ export const appRouter = router({
           ...getSessionCookieOptions(ctx.req),
           maxAge: ONE_YEAR_MS,
         });
+
+        const createdUser = await db.getUserByEmail(input.email);
+        if (createdUser) {
+          await recordPortalSignupConsent({
+            id: createdUser.id,
+            name: createdUser.name,
+            email: createdUser.email,
+            openId: createdUser.openId,
+          }).catch((err) => {
+            console.warn("[Register] Failed to record portal consent:", err);
+          });
+        }
 
         return { success: true } as const;
       }),

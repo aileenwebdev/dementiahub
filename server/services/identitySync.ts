@@ -5,6 +5,7 @@
  */
 
 import {
+  addTagsToContact,
   createContact,
   searchContactByPhone,
   updateContact,
@@ -20,6 +21,41 @@ export interface PortalUser {
   name?: string | null;
   email?: string | null;
   openId: string;
+}
+
+export async function recordPortalSignupConsent(
+  user: PortalUser,
+  options?: { ghlContactId?: string | null }
+): Promise<void> {
+  const existingIdentity = await getIdentityByUserId(user.id);
+  const consentTimestamp = existingIdentity?.consentTimestamp ?? new Date();
+
+  await upsertIdentityMap({
+    portalUserId: user.id,
+    ghlContactId: options?.ghlContactId ?? existingIdentity?.ghlContactId ?? undefined,
+    ghlLocationId: existingIdentity?.ghlLocationId ?? (config.ghlLocationId || undefined),
+    elevenlabsAgentId:
+      existingIdentity?.elevenlabsAgentId ?? (config.elevenLabsAgentId || undefined),
+    consentGiven: true,
+    consentTimestamp,
+  });
+
+  if (!config.ghlApiKey || !options?.ghlContactId) {
+    return;
+  }
+
+  try {
+    await addTagsToContact(config.ghlApiKey, options.ghlContactId, ["Consent Verified", "Portal Consent"]);
+    await updateContact(config.ghlApiKey, options.ghlContactId, {
+      customFields: [
+        { key: "consent_given", value: "true" },
+        { key: "consent_channel", value: "Portal Signup" },
+        { key: "consent_timestamp", value: consentTimestamp.toISOString() },
+      ],
+    });
+  } catch (err) {
+    console.error("[IdentitySync] Failed to sync portal consent to GHL:", err);
+  }
 }
 
 /**
@@ -109,6 +145,8 @@ export async function ensureGHLIdentity(
     elevenlabsAgentId: config.elevenLabsAgentId || undefined,
     phoneNumber: phoneNumber ?? undefined,
   });
+
+  await recordPortalSignupConsent(user, { ghlContactId });
 
   return ghlContactId;
 }
