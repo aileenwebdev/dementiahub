@@ -11,10 +11,12 @@ import {
   updateContact,
 } from "./ghl";
 import {
+  getDb,
   getIdentityByUserId,
   upsertIdentityMap,
 } from "../db";
 import { config } from "../config";
+import { users } from "../../drizzle/schema";
 
 export interface PortalUser {
   id: number;
@@ -186,4 +188,58 @@ export async function syncProfileToGHL(
   } catch (err) {
     console.error("[IdentitySync] Failed to sync profile to GHL:", err);
   }
+}
+
+export async function backfillPortalSignupConsentForAllUsers() {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const allUsers = await db.select().from(users);
+
+  let processed = 0;
+  let consented = 0;
+  let ghlLinked = 0;
+
+  for (const user of allUsers) {
+    processed += 1;
+
+    const existingIdentity = await getIdentityByUserId(user.id);
+    const ghlContactId =
+      existingIdentity?.ghlContactId ??
+      (await ensureGHLIdentity(
+        {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          openId: user.openId,
+        },
+        existingIdentity?.phoneNumber ?? undefined
+      ));
+
+    await recordPortalSignupConsent(
+      {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        openId: user.openId,
+      },
+      { ghlContactId }
+    );
+
+    const refreshedIdentity = await getIdentityByUserId(user.id);
+    if (refreshedIdentity?.consentGiven) {
+      consented += 1;
+    }
+    if (refreshedIdentity?.ghlContactId) {
+      ghlLinked += 1;
+    }
+  }
+
+  return {
+    processed,
+    consented,
+    ghlLinked,
+  };
 }

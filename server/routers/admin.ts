@@ -11,6 +11,7 @@ import {
 } from "../db";
 import { getAllConversations } from "../services/elevenlabs";
 import { extractCaregiversPipeline, getPipelines } from "../services/ghl";
+import { backfillPortalSignupConsentForAllUsers } from "../services/identitySync";
 
 export const adminRouter = router({
   overview: adminProcedure.query(async () => {
@@ -109,6 +110,16 @@ export const adminRouter = router({
         },
       },
       failedSyncs,
+    };
+  }),
+
+  backfillPortalConsent: adminProcedure.mutation(async () => {
+    const result = await backfillPortalSignupConsentForAllUsers();
+    const stats = await getAdminOverviewStats();
+
+    return {
+      result,
+      stats,
     };
   }),
 });
