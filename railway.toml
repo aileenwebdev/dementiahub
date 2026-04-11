@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "pnpm db:push && node dist/index.js"
+startCommand = "pnpm db:deploy && node dist/index.js"
 healthcheckPath = "/api/webhooks/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
