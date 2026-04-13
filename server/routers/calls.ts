@@ -180,6 +180,8 @@ export const callsRouter = router({
           caregiver_email: ctx.user.email ?? "",
           portal_user_id: String(ctx.user.id),
           portal_open_id: ctx.user.openId,
+          ghl_contact_id: identity?.ghlContactId ?? "",
+          ghl_location_id: identity?.ghlLocationId ?? config.ghlLocationId,
           wibiz_contact_id: identity?.ghlContactId ?? "",
           wibiz_location_id: identity?.ghlLocationId ?? config.ghlLocationId,
           caregiver_language: identity?.preferredLanguage ?? "en",

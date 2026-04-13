@@ -25,9 +25,7 @@ import {
   getCallSessionBySessionId,
   getCallSessionByConversationId,
   getTranscriptsBySessionId,
-  getIdentityByGhlContactId,
   insertTranscriptChunk,
-  queueFailedSync,
   updateCallSession,
   updateCallSessionByConversationId,
 } from "../db";
@@ -48,6 +46,8 @@ export interface PostCallPayload {
     dynamic_variables_echo?: {
       ghl_contact_id?: string;
       ghl_location_id?: string;
+      wibiz_contact_id?: string;
+      wibiz_location_id?: string;
       session_id?: string;
       portal_call_session_id?: string;
       portal_user_id?: string;
@@ -98,28 +98,50 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
   }
 
   let conversationData = null as Awaited<ReturnType<typeof getConversation>> | null;
-
-  // Resolve GHL contact ID from multiple sources
-  let ghlContactId =
-    rawPayload.ghl_write_targets?.contact_id ??
-    rawPayload.elevenlabs?.dynamic_variables_echo?.ghl_contact_id ??
-    rawPayload.dynamic_variables?.ghl_contact_id;
-
-  const ghlLocationId =
-    rawPayload.ghl_write_targets?.location_id ??
-    rawPayload.elevenlabs?.dynamic_variables_echo?.ghl_location_id ??
-    rawPayload.dynamic_variables?.ghl_location_id ??
-    config.ghlLocationId;
+  let linkedSession = await getCallSessionByConversationId(conversationId);
 
   if (config.elevenLabsApiKey) {
     conversationData = await getConversation(config.elevenLabsApiKey, conversationId);
   }
 
+  const portalCallSessionId =
+    rawPayload.elevenlabs?.dynamic_variables_echo?.portal_call_session_id ??
+    rawPayload.dynamic_variables?.portal_call_session_id ??
+    rawPayload.elevenlabs?.dynamic_variables_echo?.session_id ??
+    rawPayload.dynamic_variables?.session_id ??
+    conversationData?.dynamic_variables?.portal_call_session_id ??
+    conversationData?.dynamic_variables?.session_id ??
+    null;
+
+  if (!linkedSession && portalCallSessionId) {
+    linkedSession = await getCallSessionBySessionId(portalCallSessionId);
+  }
+
+  // Resolve GHL contact ID from multiple sources
+  let ghlContactId =
+    rawPayload.ghl_write_targets?.contact_id ??
+    rawPayload.elevenlabs?.dynamic_variables_echo?.ghl_contact_id ??
+    rawPayload.elevenlabs?.dynamic_variables_echo?.wibiz_contact_id ??
+    rawPayload.dynamic_variables?.ghl_contact_id ??
+    rawPayload.dynamic_variables?.wibiz_contact_id ??
+    linkedSession?.ghlContactId ??
+    undefined;
+
+  const ghlLocationId =
+    rawPayload.ghl_write_targets?.location_id ??
+    rawPayload.elevenlabs?.dynamic_variables_echo?.ghl_location_id ??
+    rawPayload.elevenlabs?.dynamic_variables_echo?.wibiz_location_id ??
+    rawPayload.dynamic_variables?.ghl_location_id ??
+    rawPayload.dynamic_variables?.wibiz_location_id ??
+    linkedSession?.ghlLocationId ??
+    config.ghlLocationId;
+
   // Fallback: fetch full conversation from ElevenLabs to get dynamic_variables
   if (!ghlContactId && conversationData) {
-    if (conversationData.dynamic_variables?.ghl_contact_id) {
-      ghlContactId = conversationData.dynamic_variables.ghl_contact_id;
-    }
+    ghlContactId =
+      conversationData.dynamic_variables?.ghl_contact_id ??
+      conversationData.dynamic_variables?.wibiz_contact_id ??
+      ghlContactId;
 
     // Last resort: phone-based lookup (inbound calls)
     if (!ghlContactId && conversationData.caller_phone && config.ghlApiKey) {
@@ -136,15 +158,6 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
   if (!ghlContactId) {
     throw new Error(`Cannot resolve GHL contact for conversation ${conversationId}`);
   }
-
-  const portalCallSessionId =
-    rawPayload.elevenlabs?.dynamic_variables_echo?.portal_call_session_id ??
-    rawPayload.dynamic_variables?.portal_call_session_id ??
-    rawPayload.elevenlabs?.dynamic_variables_echo?.session_id ??
-    rawPayload.dynamic_variables?.session_id ??
-    conversationData?.dynamic_variables?.portal_call_session_id ??
-    conversationData?.dynamic_variables?.session_id ??
-    null;
 
   // Build normalized payload
   const outcome = rawPayload.call_outcome ?? {} as NonNullable<PostCallPayload['call_outcome']>;
@@ -179,13 +192,6 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
 
   // Write to GHL
   await syncToGHL(normalizedPayload);
-
-  const linkedSession =
-    (portalCallSessionId
-      ? await getCallSessionBySessionId(portalCallSessionId)
-      : null) ??
-    (await getCallSessionByConversationId(conversationId)) ??
-    null;
 
   if (linkedSession?.sessionId && transcriptEntries.length > 0) {
     const existingChunks = await getTranscriptsBySessionId(linkedSession.sessionId);
