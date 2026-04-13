@@ -14,10 +14,62 @@ import {
 import {
   getAllConversations,
   getConversation,
+  getConversationTranscript,
   getSignedConversationUrl,
   initiateOutboundCall,
 } from "../services/elevenlabs";
 import { triageConversation } from "../services/conversationTriage";
+import { processPostCallWebhook, synthesizePostCallPayloadFromConversation } from "../services/postCallSync";
+
+async function trySyncFinishedElevenLabsCall<T extends Awaited<ReturnType<typeof getCallSessionBySessionId>>>(
+  session: T
+): Promise<T> {
+  if (!session?.elevenlabsConversationId || !config.elevenLabsApiKey) {
+    return session;
+  }
+
+  const startedAt = session.callStartTime ? new Date(session.callStartTime).getTime() : 0;
+  const secondsSinceStart = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
+  const needsRecoverySync =
+    (session.status === "active" && secondsSinceStart > 15) ||
+    (!session.transcriptRaw && !session.ghlSynced) ||
+    (!session.safetyResult && !session.ghlSynced);
+
+  if (!needsRecoverySync) {
+    return session;
+  }
+
+  const conversation = await getConversation(config.elevenLabsApiKey, session.elevenlabsConversationId);
+  const normalizedStatus = conversation?.status?.toLowerCase?.() ?? "";
+  const isFinished = ["done", "completed", "ended"].includes(normalizedStatus);
+
+  if (!conversation || !isFinished) {
+    return session;
+  }
+
+  const transcript: Array<{ role: "agent" | "user"; message: string; time_in_call_secs?: number }> =
+    conversation.transcript?.length
+      ? conversation.transcript
+      : (
+          await getConversationTranscript(config.elevenLabsApiKey, session.elevenlabsConversationId)
+        ).map((entry): { role: "agent" | "user"; message: string; time_in_call_secs?: number } => ({
+          role: entry.role === "agent" ? "agent" : "user",
+          message: entry.message,
+          time_in_call_secs: entry.time_in_call_secs,
+        }));
+
+  await processPostCallWebhook(
+    await synthesizePostCallPayloadFromConversation(
+      {
+        ...conversation,
+        transcript,
+      },
+      config.elevenLabsApiKey
+    )
+  );
+
+  return (await getCallSessionBySessionId(session.sessionId)) as T;
+}
 
 function toBrowserCallContext(params: {
   user: {
@@ -267,7 +319,7 @@ export const callsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       const sessions = await getCallSessionsByUserId(ctx.user.id, input?.limit ?? 50);
-      return sessions;
+      return Promise.all(sessions.map((session) => trySyncFinishedElevenLabsCall(session)));
     }),
 
   /**
@@ -276,7 +328,8 @@ export const callsRouter = router({
   getCallDetails: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const session = await getCallSessionBySessionId(input.sessionId);
+      const originalSession = await getCallSessionBySessionId(input.sessionId);
+      const session = await trySyncFinishedElevenLabsCall(originalSession);
 
       if (!session) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
@@ -295,7 +348,7 @@ export const callsRouter = router({
       if (
         session.elevenlabsConversationId &&
         config.elevenLabsApiKey &&
-        session.status === "completed"
+        ["completed", "synced"].includes(session.status)
       ) {
         try {
           elevenLabsData = await getConversation(

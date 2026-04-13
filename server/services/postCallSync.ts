@@ -20,6 +20,8 @@ import {
 import {
   formatTranscriptToText,
   getConversation,
+  getConversationTranscript,
+  type ElevenLabsConversation,
 } from "./elevenlabs";
 import {
   getCallSessionBySessionId,
@@ -80,6 +82,127 @@ export interface PostCallPayload {
   };
   transcript?: Array<{ role: string; message: string }>;
   metadata?: Record<string, any>;
+}
+
+function readCollectedValue(results: Record<string, any> | undefined, ...keys: string[]) {
+  if (!results) return undefined;
+
+  for (const key of keys) {
+    const value = results[key];
+    if (value === undefined || value === null) continue;
+
+    if (typeof value === "object") {
+      const nested =
+        value.value ??
+        value.result ??
+        value.answer ??
+        value.string_value ??
+        value.boolean_value ??
+        value.enum_value ??
+        value.text;
+      if (nested !== undefined && nested !== null) {
+        return nested;
+      }
+    }
+
+    return value;
+  }
+
+  return undefined;
+}
+
+function toBoolean(value: unknown, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function toStringValue(value: unknown, fallback = "") {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
+export async function synthesizePostCallPayloadFromConversation(
+  conversation: ElevenLabsConversation,
+  apiKey?: string
+): Promise<PostCallPayload> {
+  const analysisResults = conversation.analysis?.data_collection_results ?? {};
+  const transcript =
+    conversation.transcript?.length
+      ? conversation.transcript.map((entry) => ({
+          role: entry.role,
+          message: entry.message,
+        }))
+      : apiKey
+        ? await getConversationTranscript(apiKey, conversation.conversation_id)
+        : [];
+
+  return {
+    conversation_id: conversation.conversation_id,
+    dynamic_variables: conversation.dynamic_variables,
+    caller_phone: conversation.caller_phone,
+    analysis: conversation.analysis,
+    transcript,
+    elevenlabs: {
+      conversation_id: conversation.conversation_id,
+      agent_id: conversation.agent_id,
+      call_duration_seconds: conversation.call_duration_secs,
+      transcript_raw: transcript.length ? formatTranscriptToText(transcript) : undefined,
+      dynamic_variables_echo: {
+        ghl_contact_id: conversation.dynamic_variables?.ghl_contact_id,
+        ghl_location_id: conversation.dynamic_variables?.ghl_location_id,
+        wibiz_contact_id: conversation.dynamic_variables?.wibiz_contact_id,
+        wibiz_location_id: conversation.dynamic_variables?.wibiz_location_id,
+        session_id: conversation.dynamic_variables?.session_id,
+        portal_call_session_id: conversation.dynamic_variables?.portal_call_session_id,
+        portal_user_id: conversation.dynamic_variables?.portal_user_id,
+      },
+    },
+    call_outcome: {
+      safety_result: toStringValue(
+        readCollectedValue(analysisResults, "safety_result", "safety_gate_result"),
+        "SAFE"
+      ),
+      safety_flag_type: toStringValue(
+        readCollectedValue(analysisResults, "safety_flag_type", "flag_type"),
+        "none"
+      ),
+      topic_classified: toStringValue(
+        readCollectedValue(analysisResults, "topic_classified", "case_category", "topic"),
+        "general"
+      ),
+      callback_requested: toBoolean(
+        readCollectedValue(analysisResults, "callback_requested", "needs_callback"),
+        false
+      ),
+      consent_verbally_confirmed: toBoolean(
+        readCollectedValue(analysisResults, "consent_verbally_confirmed", "consent_given"),
+        false
+      ),
+      consent_timestamp: toStringValue(readCollectedValue(analysisResults, "consent_timestamp")),
+      whatsapp_summary_requested: toBoolean(
+        readCollectedValue(analysisResults, "whatsapp_summary_requested"),
+        false
+      ),
+      call_summary: toStringValue(
+        readCollectedValue(analysisResults, "call_summary", "conversation_summary"),
+        conversation.analysis?.transcript_summary ?? ""
+      ),
+      resolution_type: toStringValue(
+        readCollectedValue(analysisResults, "resolution_type"),
+        "unknown"
+      ),
+      escalation_triggered: toBoolean(
+        readCollectedValue(analysisResults, "escalation_triggered"),
+        false
+      ),
+    },
+  };
 }
 
 /**
