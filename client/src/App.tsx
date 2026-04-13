@@ -8,11 +8,15 @@ import AssistantPage from "./pages/AssistantPage";
 import AdminConversationsPage from "./pages/AdminConversationsPage";
 import AdminIntegrationPage from "./pages/AdminIntegrationPage";
 import ChatConversationDetailsPage from "./pages/ChatConversationDetailsPage";
+import DementiaAdminPortalPage from "./pages/DementiaAdminPortalPage";
+import DemoDryRunPage from "./pages/DemoDryRunPage";
 import Home from "./pages/Home";
 import CallPage from "./pages/CallPage";
 import CallHistoryPage from "./pages/CallHistoryPage";
 import CallDetailsPage from "./pages/CallDetailsPage";
+import ManagementPortalPage from "./pages/ManagementPortalPage";
 import ProfilePage from "./pages/ProfilePage";
+import StaffPortalPage from "./pages/StaffPortalPage";
 import LiveCallPage from "./pages/LiveCallPage";
 import LoginPage from "./pages/LoginPage";
 
@@ -26,6 +30,10 @@ function Router() {
       <Route path={"/admin"} component={AdminConversationsPage} />
       <Route path={"/admin/conversations"} component={AdminConversationsPage} />
       <Route path={"/admin/integration"} component={AdminIntegrationPage} />
+      <Route path={"/demo/dry-run"} component={DemoDryRunPage} />
+      <Route path={"/portal/staff"} component={StaffPortalPage} />
+      <Route path={"/portal/management"} component={ManagementPortalPage} />
+      <Route path={"/portal/dementia-admin"} component={DementiaAdminPortalPage} />
       <Route path={"/call"} component={CallPage} />
       <Route path={"/call/:sessionId"} component={CallDetailsPage} />
       <Route path={"/call/:sessionId/live"} component={LiveCallPage} />

@@ -96,6 +96,15 @@ export default function Home() {
               <Button onClick={() => setLocation("/assistant")} className="h-11 rounded-full bg-[#1d4e4b] px-5 hover:bg-[#0f2e2c]">
                 Open Assistant
               </Button>
+              {user?.role === "admin" && (
+                <Button
+                  variant="outline"
+                  onClick={() => setLocation("/demo/dry-run")}
+                  className="h-11 rounded-full border-[#1d4e4b]/15 bg-white/70 px-5 text-[#1d4e4b] hover:bg-white"
+                >
+                  Open Dry Run Center
+                </Button>
+              )}
             </div>
           </div>
         </section>
@@ -240,6 +249,9 @@ export default function Home() {
                   { label: "Continue assistant chat", action: () => setLocation("/assistant") },
                   { label: "Review profile linkage", action: () => setLocation("/profile") },
                   { label: "Start a new call", action: () => setLocation("/call") },
+                  ...(user?.role === "admin"
+                    ? [{ label: "Preview staff portal", action: () => setLocation("/portal/staff") }]
+                    : []),
                 ].map((item) => (
                   <button
                     key={item.label}

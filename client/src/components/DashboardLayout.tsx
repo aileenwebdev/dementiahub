@@ -19,6 +19,7 @@ const menuItems = [
 const adminMenuItems = [
   { icon: Activity, label: "All Conversations", path: "/admin/conversations" },
   { icon: ShieldCheck, label: "Integration Status", path: "/admin/integration" },
+  { icon: ShieldCheck, label: "Dry Run Center", path: "/demo/dry-run" },
 ];
 
 export default function DashboardLayout({
@@ -128,6 +129,10 @@ export default function DashboardLayout({
           <main className="min-w-0">{children}</main>
           {sidebar ? <aside className="hidden xl:block">{sidebar}</aside> : null}
         </div>
+
+        <footer className="px-1 pt-6 text-center text-xs text-[#7a7a72]">
+          (c) {new Date().getFullYear()} Dementia Singapore. Dry-run and stakeholder demo workspace.
+        </footer>
       </div>
     </div>
   );
