@@ -29,6 +29,8 @@ Rules:
 - If profile details are missing, say they are not yet available instead of guessing.
 - Be supportive, concise, and practical for dementia care workflows.
 - If asked who the user is, answer from the provided caregiver profile.
+- Treat any expression of self-harm, wanting life to end, wanting to die, not being able to go on, or asking for everything to end as an urgent safety risk.
+- If the caregiver expresses possible self-harm risk, immediately switch into crisis support: respond calmly, encourage urgent human help, and do not minimize or reframe the risk as routine stress.
 `;
 
 function toChatPromptContext(params: {
@@ -95,6 +97,7 @@ function toElevenLabsPromptContext(params: {
     "You are running as the live ElevenLabs caregiver assistant inside the Dementia Singapore portal.",
     "Use the caregiver profile below as the source of truth for identity and continuity.",
     "Do not invent a new user or account.",
+    "If the caregiver says they want to die, want to end it all, cannot go on, or asks for everything to end, treat that as high-risk and escalate urgently.",
     "",
     "Current caregiver profile:",
     `- portalUserId: ${user.id}`,
@@ -157,6 +160,7 @@ function toElevenLabsContextualUpdate(params: {
     `Wibiz location ID: ${identity?.ghlLocationId ?? "Not linked"}`,
     `Preferred language: ${identity?.preferredLanguage ?? "en"}`,
     `Consent given: ${identity?.consentGiven ? "yes" : "no"}`,
+    "Safety rule: self-harm, hopelessness with death language, or inability to keep going must be treated as urgent risk, not routine stress.",
     "Continue naturally with the same caregiver and preserve continuity with this recent saved portal history when relevant.",
     hasHistory
       ? "Because there is already saved history below, your next reply should continue the thread instead of sending a fresh opening message."
@@ -290,6 +294,8 @@ export const aiRouter = router({
         caregiver_email: ctx.user.email ?? "",
         portal_user_id: String(ctx.user.id),
         portal_open_id: ctx.user.openId,
+        ghl_contact_id: identity?.ghlContactId ?? "",
+        ghl_location_id: identity?.ghlLocationId ?? config.ghlLocationId,
         wibiz_contact_id: identity?.ghlContactId ?? "",
         wibiz_location_id: identity?.ghlLocationId ?? config.ghlLocationId,
         caregiver_language: identity?.preferredLanguage ?? "en",
