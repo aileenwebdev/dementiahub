@@ -30,8 +30,9 @@ async function trySyncFinishedElevenLabsCall<T extends Awaited<ReturnType<typeof
 
   const startedAt = session.callStartTime ? new Date(session.callStartTime).getTime() : 0;
   const secondsSinceStart = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
+  const isStale = ["active", "completed"].includes(session.status);
   const needsRecoverySync =
-    (session.status === "active" && secondsSinceStart > 15) ||
+    (isStale && secondsSinceStart > 15) ||
     (!session.transcriptRaw && !session.ghlSynced) ||
     (!session.safetyResult && !session.ghlSynced);
 

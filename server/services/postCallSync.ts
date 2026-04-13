@@ -26,6 +26,7 @@ import {
 import {
   getCallSessionBySessionId,
   getCallSessionByConversationId,
+  getIdentityByUserId,
   getTranscriptsBySessionId,
   insertTranscriptChunk,
   updateCallSession,
@@ -266,7 +267,7 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
       conversationData.dynamic_variables?.wibiz_contact_id ??
       ghlContactId;
 
-    // Last resort: phone-based lookup (inbound calls)
+    // Phone-based lookup (inbound calls)
     if (!ghlContactId && conversationData.caller_phone && config.ghlApiKey) {
       const { searchContactByPhone } = await import("./ghl");
       const contact = await searchContactByPhone(
@@ -275,6 +276,25 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
         conversationData.caller_phone
       );
       if (contact) ghlContactId = contact.id;
+    }
+  }
+
+  // Last resort: look up logged-in portal user's identity by portal_user_id
+  if (!ghlContactId) {
+    const rawPortalUserId =
+      rawPayload.elevenlabs?.dynamic_variables_echo?.portal_user_id ??
+      rawPayload.dynamic_variables?.portal_user_id ??
+      conversationData?.dynamic_variables?.portal_user_id ??
+      linkedSession?.portalUserId?.toString();
+
+    if (rawPortalUserId) {
+      const identity = await getIdentityByUserId(parseInt(rawPortalUserId, 10));
+      if (identity?.ghlContactId) {
+        ghlContactId = identity.ghlContactId;
+        console.log(
+          `[PostCallSync] Resolved ghl_contact_id via portal_user_id ${rawPortalUserId}: ${ghlContactId}`
+        );
+      }
     }
   }
 
@@ -433,14 +453,18 @@ async function syncToGHL(payload: NormalizedCallPayload) {
         ghlLocationId,
         ghlContactId
       );
-      // Use the most recent open opportunity
-      const openOpp = opportunities.find((o) => o.status === "open");
+      // Use the most recent open opportunity in the cases pipeline
+      const openOpp = opportunities.find(
+        (o) =>
+          o.status === "open" &&
+          (o.pipelineId === config.ghlCasesPipelineId || !config.ghlCasesPipelineId)
+      ) ?? opportunities.find((o) => o.status === "open");
       opportunityId = openOpp?.id;
 
       if (!opportunityId) {
-        // Create a new opportunity
+        // Create a new opportunity in the cases pipeline
         const pipelines = await getPipelines(config.ghlApiKey, ghlLocationId);
-        const pipeline = extractCaregiversPipeline(pipelines);
+        const pipeline = extractCaregiversPipeline(pipelines, config.ghlCasesPipelineId);
         if (pipeline) {
           const firstStage = pipeline.stages[0];
           const opp = await createOpportunity(config.ghlApiKey, {
@@ -462,7 +486,7 @@ async function syncToGHL(payload: NormalizedCallPayload) {
   if (opportunityId) {
     try {
       const pipelines = await getPipelines(config.ghlApiKey, ghlLocationId);
-      const pipeline = extractCaregiversPipeline(pipelines);
+      const pipeline = extractCaregiversPipeline(pipelines, config.ghlCasesPipelineId);
       const targetStageName = resolveTargetStageName(
         safetyResult,
         callbackRequested,
