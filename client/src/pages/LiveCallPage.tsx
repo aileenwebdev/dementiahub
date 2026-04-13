@@ -87,6 +87,7 @@ export default function LiveCallPage() {
           <Card className="overflow-hidden border-[#ddd3c4] bg-[#fffdf9]">
             <CardContent className="p-4 sm:p-6">
               <ElevenLabsVoiceWidget
+                sessionId={sessionId ?? ""}
                 signedUrl={sessionQuery.data.signedUrl}
                 dynamicVariables={sessionQuery.data.dynamicVariables}
                 overridePrompt={sessionQuery.data.overridePrompt}

@@ -334,7 +334,7 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
   };
 
   // Write to GHL
-  await syncToGHL(normalizedPayload);
+  const { opportunityId: syncedOpportunityId } = await syncToGHL(normalizedPayload);
 
   if (linkedSession?.sessionId && transcriptEntries.length > 0) {
     const existingChunks = await getTranscriptsBySessionId(linkedSession.sessionId);
@@ -356,6 +356,7 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
     ghlContactId,
     ghlLocationId,
     elevenlabsConversationId: conversationId,
+    ghlOpportunityId: syncedOpportunityId ?? undefined,
     safetyResult: normalizedPayload.safetyResult as any,
     safetyFlagType: normalizedPayload.safetyFlagType,
     topicClassified: normalizedPayload.topicClassified,
@@ -403,13 +404,14 @@ interface NormalizedCallPayload {
   callEndTime: Date;
 }
 
-async function syncToGHL(payload: NormalizedCallPayload) {
+async function syncToGHL(payload: NormalizedCallPayload): Promise<{ opportunityId?: string }> {
   if (!config.ghlApiKey) {
     console.warn("[PostCallSync] GHL not configured, skipping sync");
-    return;
+    return {};
   }
 
   const {
+    conversationId,
     ghlContactId,
     ghlLocationId,
     transcriptRaw,
@@ -426,7 +428,9 @@ async function syncToGHL(payload: NormalizedCallPayload) {
     consentVerballyConfirmed,
   } = payload;
 
-  // STEP 1: Update GHL Contact with callback and consent fields
+  let resolvedOpportunityId: string | undefined;
+
+  // STEP 1: Update GHL Contact with callback, consent, and call tracking fields
   try {
     const tags: string[] = ["Voice Case - " + safetyResult];
     if (consentVerballyConfirmed) tags.push("Consent Verified");
@@ -438,6 +442,7 @@ async function syncToGHL(payload: NormalizedCallPayload) {
         { key: "callback_requested", value: String(callbackRequested) },
         { key: "last_call_safety_result", value: safetyResult },
         { key: "last_call_date", value: callEndTime.toISOString() },
+        { key: "call_conversation_id", value: conversationId },
       ],
     });
   } catch (err) {
@@ -481,6 +486,7 @@ async function syncToGHL(payload: NormalizedCallPayload) {
       console.error("[PostCallSync] Failed to find/create opportunity:", err);
     }
   }
+  resolvedOpportunityId = opportunityId;
 
   // STEP 3: Update Opportunity with call outcome
   if (opportunityId) {
@@ -497,6 +503,7 @@ async function syncToGHL(payload: NormalizedCallPayload) {
       await updateOpportunity(config.ghlApiKey, opportunityId, {
         pipelineStageId: targetStage?.id,
         customFields: [
+          { key: "elevenlabs_conversation_id", value: conversationId },
           { key: "voice_transcript", value: transcriptRaw },
           { key: "asr_confidence", value: asrConfidence },
           { key: "safety_gate_result", value: safetyResult },
@@ -525,9 +532,9 @@ async function syncToGHL(payload: NormalizedCallPayload) {
 
   // STEP 4: Add contact note with transcript
   try {
-    
-      const noteBody = `☎ VOICE CALL SUMMARY — ${callEndTime.toISOString()}
+    const noteBody = `☎ VOICE CALL SUMMARY — ${callEndTime.toISOString()}
 
+ElevenLabs Conversation ID: ${conversationId}
 Duration: ${callDurationSeconds}s
 Safety: ${safetyResult}
 Topic: ${topicClassified}
@@ -539,10 +546,12 @@ ${callSummary}
 --- FULL TRANSCRIPT ---
 ${transcriptRaw}`;
 
-      await addNoteToContact(config.ghlApiKey, ghlContactId, noteBody);
+    await addNoteToContact(config.ghlApiKey, ghlContactId, noteBody);
   } catch (err) {
     console.error("[PostCallSync] Failed to add GHL note:", err);
   }
+
+  return { opportunityId: resolvedOpportunityId };
 }
 
 
