@@ -1,14 +1,14 @@
 /**
  * ElevenLabsVoiceWidget
  *
- * Uses the @elevenlabs/client SDK (not the passive HTML embed) so every event
- * is wired back to the portal:
- *   - onConnect  → bindBrowserConversation (saves conv_id to DB session)
- *   - onMessage  → appendBrowserTranscriptChunk (saves each line in real time)
- *   - onDisconnect → completeBrowserVoiceCall (marks session complete + triage)
+ * Uses the @elevenlabs/client SDK (Conversation.startSession) — not the passive
+ * HTML embed — so every event is wired back to the portal:
+ *   onConnect    → bindBrowserConversation (saves conv_id to DB session)
+ *   onMessage    → appendBrowserTranscriptChunk (saves each line in real time)
+ *   onDisconnect → completeBrowserVoiceCall (marks session complete + triage)
  */
 
-import { useConversation } from "@elevenlabs/client";
+import { Conversation } from "@elevenlabs/client";
 import { Bot, Loader2, Mic, MicOff, Phone, PhoneOff, User } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -32,6 +32,8 @@ type TranscriptLine = {
   timestamp: number;
 };
 
+type CallStatus = "idle" | "connecting" | "connected" | "disconnecting" | "ended";
+
 export function ElevenLabsVoiceWidget({
   sessionId,
   signedUrl,
@@ -41,80 +43,41 @@ export function ElevenLabsVoiceWidget({
   className,
 }: Props) {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
-  const [callEnded, setCallEnded] = useState(false);
+  const [callStatus, setCallStatus] = useState<CallStatus>("idle");
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const conversationRef = useRef<Awaited<ReturnType<typeof Conversation.startSession>> | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  const endedRef = useRef(false);
 
   const bindConversation = trpc.calls.bindBrowserConversation.useMutation();
   const appendChunk = trpc.calls.appendBrowserTranscriptChunk.useMutation();
   const completeCall = trpc.calls.completeBrowserVoiceCall.useMutation();
 
-  const handleConnect = useCallback(
-    ({ conversationId }: { conversationId: string }) => {
-      conversationIdRef.current = conversationId;
-      void bindConversation.mutateAsync({ sessionId, conversationId }).catch((err) => {
-        console.error("[VoiceWidget] bindBrowserConversation failed:", err);
-      });
-    },
-    [sessionId, bindConversation]
-  );
-
-  const handleMessage = useCallback(
-    ({ message, source }: { message: string; source: string }) => {
-      const speaker: "agent" | "user" = source === "ai" ? "agent" : "user";
-      const timestamp = Date.now();
-
-      setTranscript((prev) => [...prev, { speaker, text: message, timestamp }]);
-
-      void appendChunk
-        .mutateAsync({
-          sessionId,
-          conversationId: conversationIdRef.current ?? undefined,
-          speaker,
-          text: message,
-          timestamp,
-        })
-        .catch((err) => {
-          console.error("[VoiceWidget] appendBrowserTranscriptChunk failed:", err);
-        });
-    },
-    [sessionId, appendChunk]
-  );
-
   const handleDisconnect = useCallback(async () => {
-    if (callEnded) return;
-    setCallEnded(true);
+    if (endedRef.current) return;
+    endedRef.current = true;
+    setCallStatus("ended");
     setCompleting(true);
     try {
       await completeCall.mutateAsync({ sessionId });
       toast.success("Call saved", {
-        description: "Transcript and summary have been saved to your history.",
+        description: "Transcript and summary saved to your history.",
       });
     } catch (err: any) {
       console.error("[VoiceWidget] completeBrowserVoiceCall failed:", err);
-      toast.error("Could not save call", { description: err?.message });
+      toast.error("Could not finalise call", { description: err?.message });
     } finally {
       setCompleting(false);
     }
-  }, [sessionId, completeCall, callEnded]);
-
-  const conversation = useConversation({
-    onConnect: handleConnect,
-    onDisconnect: handleDisconnect,
-    onMessage: handleMessage,
-    onError: (message: string) => {
-      console.error("[VoiceWidget] ElevenLabs error:", message);
-      toast.error("Voice call error", { description: message });
-    },
-  });
-
-  const isConnecting = conversation.status === "connecting";
-  const isConnected = conversation.status === "connected";
-  const isActive = isConnecting || isConnected;
+  }, [sessionId, completeCall]);
 
   const handleStart = async () => {
     try {
-      await conversation.startSession({
+      setCallStatus("connecting");
+      endedRef.current = false;
+
+      const conv = await Conversation.startSession({
         signedUrl,
         dynamicVariables,
         ...(overridePrompt || overrideFirstMessage
@@ -127,20 +90,64 @@ export function ElevenLabsVoiceWidget({
               },
             }
           : {}),
+        onConnect: ({ conversationId }) => {
+          conversationIdRef.current = conversationId;
+          setCallStatus("connected");
+          void bindConversation
+            .mutateAsync({ sessionId, conversationId })
+            .catch((err) => console.error("[VoiceWidget] bindBrowserConversation failed:", err));
+        },
+        onDisconnect: () => {
+          void handleDisconnect();
+        },
+        onMessage: ({ message, source }: { message: string; source: string }) => {
+          const speaker: "agent" | "user" = source === "ai" ? "agent" : "user";
+          const timestamp = Date.now();
+          setTranscript((prev) => [...prev, { speaker, text: message, timestamp }]);
+          void appendChunk
+            .mutateAsync({
+              sessionId,
+              conversationId: conversationIdRef.current ?? undefined,
+              speaker,
+              text: message,
+              timestamp,
+            })
+            .catch((err) => console.error("[VoiceWidget] appendBrowserTranscriptChunk failed:", err));
+        },
+        onModeChange: ({ mode }: { mode: string }) => {
+          setIsSpeaking(mode === "speaking");
+        },
+        onStatusChange: ({ status }: { status: string }) => {
+          if (status === "disconnecting") setCallStatus("disconnecting");
+        },
+        onError: (message: string) => {
+          console.error("[VoiceWidget] ElevenLabs error:", message);
+          toast.error("Voice call error", { description: message });
+        },
       });
+
+      conversationRef.current = conv;
     } catch (err: any) {
       console.error("[VoiceWidget] startSession failed:", err);
+      setCallStatus("idle");
       toast.error("Could not start voice call", { description: err?.message });
     }
   };
 
   const handleStop = async () => {
     try {
-      await conversation.endSession();
+      setCallStatus("disconnecting");
+      await conversationRef.current?.endSession();
     } catch (err: any) {
       console.error("[VoiceWidget] endSession failed:", err);
+      void handleDisconnect();
     }
   };
+
+  const isConnecting = callStatus === "connecting";
+  const isConnected = callStatus === "connected";
+  const isActive = isConnecting || isConnected || callStatus === "disconnecting";
+  const isEnded = callStatus === "ended";
 
   return (
     <div className={cn("flex flex-col gap-5", className)}>
@@ -150,7 +157,7 @@ export function ElevenLabsVoiceWidget({
         <div
           className={cn(
             "flex h-24 w-24 items-center justify-center rounded-full transition-all duration-500",
-            isConnected && conversation.isSpeaking
+            isConnected && isSpeaking
               ? "animate-pulse bg-[#1d4e4b] shadow-[0_0_40px_rgba(29,78,75,0.35)]"
               : isConnected
                 ? "bg-[#1d4e4b]/20 shadow-[0_0_20px_rgba(29,78,75,0.15)]"
@@ -160,12 +167,12 @@ export function ElevenLabsVoiceWidget({
           {isConnecting ? (
             <Loader2 className="h-10 w-10 animate-spin text-[#1d4e4b]" />
           ) : isConnected ? (
-            conversation.isSpeaking ? (
+            isSpeaking ? (
               <Bot className="h-10 w-10 text-white" />
             ) : (
               <Mic className="h-10 w-10 text-[#1d4e4b]" />
             )
-          ) : callEnded ? (
+          ) : isEnded ? (
             <PhoneOff className="h-10 w-10 text-muted-foreground" />
           ) : (
             <Phone className="h-10 w-10 text-muted-foreground" />
@@ -180,8 +187,8 @@ export function ElevenLabsVoiceWidget({
           {isConnected && (
             <div className="flex flex-col items-center gap-1">
               <Badge className="gap-1.5 bg-[#1d4e4b]/10 text-[#1d4e4b] hover:bg-[#1d4e4b]/10">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#1d4e4b] animate-pulse" />
-                {conversation.isSpeaking ? "Agent speaking" : "Listening…"}
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#1d4e4b]" />
+                {isSpeaking ? "Agent speaking" : "Listening…"}
               </Badge>
               {conversationIdRef.current && (
                 <p className="mt-1 font-mono text-[10px] text-muted-foreground">
@@ -190,12 +197,15 @@ export function ElevenLabsVoiceWidget({
               )}
             </div>
           )}
-          {!isActive && !callEnded && (
+          {callStatus === "disconnecting" && (
+            <p className="text-sm text-muted-foreground">Ending call…</p>
+          )}
+          {!isActive && !isEnded && (
             <p className="text-sm text-muted-foreground">
               Click the button below to connect your microphone and start talking.
             </p>
           )}
-          {callEnded && (
+          {isEnded && (
             <p className="text-sm text-muted-foreground">
               {completing ? "Saving your call…" : "Call ended and saved to your history."}
             </p>
@@ -203,13 +213,12 @@ export function ElevenLabsVoiceWidget({
         </div>
 
         {/* Action button */}
-        {!callEnded && (
+        {!isEnded && (
           <div className="flex gap-3">
-            {!isActive ? (
+            {callStatus === "idle" ? (
               <Button
                 className="gap-2 rounded-2xl bg-[#1d4e4b] px-8 hover:bg-[#0f2e2c]"
                 onClick={handleStart}
-                disabled={isConnecting}
               >
                 <Mic className="h-4 w-4" />
                 Connect Mic & Start Call
@@ -219,7 +228,7 @@ export function ElevenLabsVoiceWidget({
                 variant="outline"
                 className="gap-2 rounded-2xl border-red-200 px-8 text-red-700 hover:bg-red-50"
                 onClick={handleStop}
-                disabled={isConnecting}
+                disabled={callStatus === "disconnecting"}
               >
                 <MicOff className="h-4 w-4" />
                 End Call
