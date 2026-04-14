@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { config, isGHLConfigured, isElevenLabsConfigured, verifyElevenLabsWebhookSecret } from "./config";
+import {
+  config,
+  isElevenLabsConfigured,
+  isGHLConfigured,
+  normalizeBearerToken,
+  verifyElevenLabsWebhookSecret,
+} from "./config";
 
 describe("config", () => {
   it("should have GHL_API_KEY set", () => {
@@ -45,5 +51,11 @@ describe("config", () => {
 
   it("isElevenLabsConfigured returns boolean", () => {
     expect(typeof isElevenLabsConfigured()).toBe("boolean");
+  });
+
+  it("normalizes bearer tokens copied with a prefix, quotes, or spaces", () => {
+    expect(normalizeBearerToken("Bearer pit-123")).toBe("pit-123");
+    expect(normalizeBearerToken("  'pit-456'  ")).toBe("pit-456");
+    expect(normalizeBearerToken('  "pit-789"  ')).toBe("pit-789");
   });
 });

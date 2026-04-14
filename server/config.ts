@@ -1,29 +1,49 @@
 /**
- * Server-side configuration — reads from environment variables.
- * All secrets must be set via webdev_request_secrets, never hardcoded.
+ * Server-side configuration reads from environment variables.
+ * All secrets must be supplied via environment configuration, never hardcoded.
  */
+
+function normalizeEnvValue(value: string | undefined): string {
+  if (!value) return "";
+
+  const trimmed = value.trim();
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1).trim()
+      : trimmed;
+
+  return unquoted;
+}
+
+export function normalizeBearerToken(value: string | undefined): string {
+  const normalized = normalizeEnvValue(value);
+  if (!normalized) return "";
+
+  return normalized.replace(/^Bearer\s+/i, "").trim();
+}
 
 export const config = {
   // GHL API
-  ghlApiKey: process.env.GHL_API_KEY ?? "",
-  ghlLocationId: process.env.GHL_LOCATION_ID ?? "",
+  ghlApiKey: normalizeBearerToken(process.env.GHL_API_KEY),
+  ghlLocationId: normalizeEnvValue(process.env.GHL_LOCATION_ID),
 
   // ElevenLabs API
-  elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
-  elevenLabsAgentId: process.env.ELEVENLABS_AGENT_ID ?? "",
+  elevenLabsApiKey: normalizeBearerToken(process.env.ELEVENLABS_API_KEY),
+  elevenLabsAgentId: normalizeEnvValue(process.env.ELEVENLABS_AGENT_ID),
 
   // Webhook secrets (for verifying inbound webhook authenticity)
   elevenLabsPostCallWebhookSecret:
-    process.env.ELEVENLABS_POSTCALL_WEBHOOK_SECRET ??
-    process.env.ELEVENLABS_WEBHOOK_SECRET ??
+    normalizeEnvValue(process.env.ELEVENLABS_POSTCALL_WEBHOOK_SECRET) ||
+    normalizeEnvValue(process.env.ELEVENLABS_WEBHOOK_SECRET) ||
     "dementiahub-webhook-secret-2026",
   elevenLabsConsentWebhookSecret:
-    process.env.ELEVENLABS_CONSENT_WEBHOOK_SECRET ??
-    process.env.ELEVENLABS_WEBHOOK_SECRET ??
+    normalizeEnvValue(process.env.ELEVENLABS_CONSENT_WEBHOOK_SECRET) ||
+    normalizeEnvValue(process.env.ELEVENLABS_WEBHOOK_SECRET) ||
     "dementiahub-webhook-secret-2026",
 
   // App
-  appUrl: process.env.APP_URL ?? "http://localhost:3000",
+  appUrl: normalizeEnvValue(process.env.APP_URL) || "http://localhost:3000",
 };
 
 /**
