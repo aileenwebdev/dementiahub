@@ -40,6 +40,13 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge className={`text-xs ${s.className}`}>{s.label}</Badge>;
 }
 
+const stickyColumnClass = {
+  safety: "sticky right-[280px] z-20 bg-white",
+  status: "sticky right-[170px] z-20 bg-white",
+  sync: "sticky right-[80px] z-20 bg-white",
+  action: "sticky right-0 z-30 bg-white",
+} as const;
+
 type HistoryItem = {
   id: string;
   kind: "call" | "chat";
@@ -235,17 +242,17 @@ export default function CallHistoryPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="table-fixed">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[160px]">Date</TableHead>
                       <TableHead className="w-[110px]">Channel</TableHead>
-                      <TableHead>Topic</TableHead>
-                      <TableHead>Safety</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>GHL Sync</TableHead>
-                      <TableHead className="w-[80px]"></TableHead>
+                      <TableHead className="w-[320px] min-w-[320px]">Topic</TableHead>
+                      <TableHead className={`w-[110px] ${stickyColumnClass.safety}`}>Safety</TableHead>
+                      <TableHead className={`w-[110px] ${stickyColumnClass.status}`}>Status</TableHead>
+                      <TableHead className="w-[95px]">Duration</TableHead>
+                      <TableHead className={`w-[90px] ${stickyColumnClass.sync}`}>GHL Sync</TableHead>
+                      <TableHead className={`w-[80px] ${stickyColumnClass.action}`}></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -274,15 +281,25 @@ export default function CallHistoryPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <p className="text-sm font-medium capitalize">{item.title}</p>
+                          <p
+                            className="truncate text-sm font-medium capitalize"
+                            title={item.title}
+                          >
+                            {item.title}
+                          </p>
                           {item.summary ? (
-                            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{item.summary}</p>
+                            <p
+                              className="mt-0.5 line-clamp-2 break-words text-xs text-muted-foreground"
+                              title={item.summary}
+                            >
+                              {item.summary}
+                            </p>
                           ) : null}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={stickyColumnClass.safety}>
                           <SafetyBadge result={item.safetyResult} />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={stickyColumnClass.status}>
                           <StatusBadge status={item.status} />
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
@@ -290,14 +307,14 @@ export default function CallHistoryPage() {
                             ? `${Math.floor(item.durationSeconds / 60)}m ${item.durationSeconds % 60}s`
                             : "—"}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={stickyColumnClass.sync}>
                           {item.ghlSynced ? (
                             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                           ) : (
                             <Clock className="h-4 w-4 text-muted-foreground" />
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={stickyColumnClass.action}>
                           <Button
                             variant="ghost"
                             size="sm"
