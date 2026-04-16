@@ -8,7 +8,7 @@ import { Activity, Brain, History, LayoutDashboard, LogOut, MessageSquare, Phone
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
-const menuItems = [
+const caregiverMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: MessageSquare, label: "AI Assistant", path: "/assistant" },
   { icon: Phone, label: "Start a Call", path: "/call" },
@@ -17,9 +17,14 @@ const menuItems = [
 ];
 
 const adminMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: MessageSquare, label: "AI Assistant", path: "/assistant" },
+  { icon: Phone, label: "Start a Call", path: "/call" },
   { icon: Activity, label: "All Conversations", path: "/admin/conversations" },
+  { icon: History, label: "Conversation History", path: "/history" },
   { icon: ShieldCheck, label: "Integration Status", path: "/admin/integration" },
   { icon: ShieldCheck, label: "Dry Run Center", path: "/demo/dry-run" },
+  { icon: User, label: "My Profile", path: "/profile" },
 ];
 
 export default function DashboardLayout({
@@ -56,7 +61,7 @@ export default function DashboardLayout({
     );
   }
 
-  const visibleItems = user.role === "admin" ? [...menuItems, ...adminMenuItems] : menuItems;
+  const visibleItems = user.role === "admin" ? adminMenuItems : caregiverMenuItems;
 
   return (
     <div className="min-h-screen bg-transparent">

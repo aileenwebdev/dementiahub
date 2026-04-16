@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Activity, AlertTriangle, Brain, CheckCircle2, Clock, Phone, PhoneCall, Shield, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, Brain, CheckCircle2, Clock, MessageSquare, Phone, PhoneCall, Shield, XCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import DashboardLayout from "../components/DashboardLayout";
@@ -29,9 +29,10 @@ export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { data: callHistory } = trpc.calls.getCallHistory.useQuery({
-    limit: 5,
+    limit: 20,
     source: "dashboard_home",
   });
+  const { data: chatHistory } = trpc.ai.getConversationHistory.useQuery({ limit: 20 });
   const { data: integrationStatus } = trpc.ghl.getIntegrationStatus.useQuery();
   const { data: setupStatus } = trpc.identity.checkSetupStatus.useQuery();
   const { data: identity } = trpc.identity.getMyIdentity.useQuery();
@@ -44,8 +45,35 @@ export default function Home() {
   const totalCalls = callHistory?.length ?? 0;
   const completedCalls = callHistory?.filter((c) => c.status === "completed" || c.status === "synced").length ?? 0;
   const safeCalls = callHistory?.filter((c) => c.safetyResult === "SAFE").length ?? 0;
+  const cautionCalls = callHistory?.filter((c) => c.safetyResult === "CAUTION").length ?? 0;
   const callbackPending = callHistory?.filter((c) => c.callbackRequested && c.status !== "synced").length ?? 0;
-  const recentCalls = callHistory?.slice(0, 5) ?? [];
+  const recentConversations = [
+    ...(callHistory?.map((call) => ({
+      id: `call-${call.id}`,
+      kind: "call" as const,
+      title: call.topicClassified ? call.topicClassified.replace(/_/g, " ") : "Voice call",
+      summary: call.callSummary ?? null,
+      createdAt: call.createdAt,
+      updatedAt: call.updatedAt,
+      href: `/call/${call.sessionId}`,
+      safetyResult: call.safetyResult,
+    })) ?? []),
+    ...(chatHistory?.map((chat) => ({
+      id: `chat-${chat.id}`,
+      kind: "chat" as const,
+      title: chat.title ?? "Caregiver support chat",
+      summary: chat.conversationSummary ?? chat.lastMessagePreview ?? null,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      href: `/history/chat/${chat.id}`,
+      safetyResult: chat.safetyResult,
+    })) ?? []),
+  ]
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt ?? b.createdAt).getTime() - new Date(a.updatedAt ?? a.createdAt).getTime()
+    )
+    .slice(0, 5);
 
   const sidebar = (
     <div className="cg-sidebar-card sticky top-[104px] rounded-[1.6rem] p-6">
@@ -129,14 +157,50 @@ export default function Home() {
           </section>
         )}
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {[
-            { label: "Total Calls", value: totalCalls, icon: PhoneCall, tone: "bg-[#1d4e4b]/10 text-[#1d4e4b]" },
-            { label: "Completed", value: completedCalls, icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-700" },
-            { label: "Safe Calls", value: safeCalls, icon: Shield, tone: "bg-[#7a9e8a]/14 text-[#527a68]" },
-            { label: "Callbacks Due", value: callbackPending, icon: Clock, tone: "bg-[#d4935a]/14 text-[#b77642]" },
+            {
+              label: "Total Calls",
+              value: totalCalls,
+              icon: PhoneCall,
+              tone: "bg-[#1d4e4b]/10 text-[#1d4e4b]",
+              href: "/history?channel=call",
+            },
+            {
+              label: "Completed",
+              value: completedCalls,
+              icon: CheckCircle2,
+              tone: "bg-emerald-100 text-emerald-700",
+              href: "/history?channel=call&status=completed",
+            },
+            {
+              label: "Safe Calls",
+              value: safeCalls,
+              icon: Shield,
+              tone: "bg-[#7a9e8a]/14 text-[#527a68]",
+              href: "/history?channel=call&safety=SAFE",
+            },
+            {
+              label: "Caution",
+              value: cautionCalls,
+              icon: AlertTriangle,
+              tone: "bg-amber-100 text-amber-700",
+              href: "/history?channel=call&safety=CAUTION",
+            },
+            {
+              label: "Callbacks Due",
+              value: callbackPending,
+              icon: Clock,
+              tone: "bg-[#d4935a]/14 text-[#b77642]",
+              href: "/history?channel=call&safety=CAUTION",
+            },
           ].map((stat) => (
-            <div key={stat.label} className="cg-stat rounded-[1.5rem] p-5">
+            <button
+              key={stat.label}
+              type="button"
+              onClick={() => setLocation(stat.href)}
+              className="cg-stat rounded-[1.5rem] p-5 text-left transition-transform hover:-translate-y-0.5"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="cg-label">{stat.label}</p>
@@ -146,7 +210,7 @@ export default function Home() {
                   <stat.icon className="h-5 w-5" />
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </section>
 
@@ -154,7 +218,7 @@ export default function Home() {
           <div className="cg-panel rounded-[2rem] p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
-                <p className="cg-label">Recent Call History</p>
+                <p className="cg-label">Recent Conversations</p>
                 <h2 className="cg-display mt-2 text-3xl font-bold text-[#0f2e2c]">Your latest conversations</h2>
               </div>
               <Button variant="ghost" onClick={() => setLocation("/history")} className="rounded-full text-[#527a68] hover:bg-[#ede7dc] hover:text-[#0f2e2c]">
@@ -162,37 +226,50 @@ export default function Home() {
               </Button>
             </div>
 
-            {recentCalls.length === 0 ? (
+            {recentConversations.length === 0 ? (
               <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-[#ddd3c4] bg-white/50 px-6 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ede7dc]">
-                  <PhoneCall className="h-6 w-6 text-[#527a68]" />
+                  <MessageSquare className="h-6 w-6 text-[#527a68]" />
                 </div>
-                <p className="mt-4 text-lg font-medium text-[#0f2e2c]">No calls yet</p>
+                <p className="mt-4 text-lg font-medium text-[#0f2e2c]">No conversations yet</p>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-                  Start your first call to build a support history for this caregiver account.
+                  Start a chat or call to build a support history for this caregiver account.
                 </p>
-                <Button onClick={() => setLocation("/call")} className="mt-5 rounded-full bg-[#1d4e4b] px-5 hover:bg-[#0f2e2c]">
-                  Start a Call
-                </Button>
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <Button onClick={() => setLocation("/assistant")} variant="outline" className="rounded-full px-5">
+                    Open Chat
+                  </Button>
+                  <Button onClick={() => setLocation("/call")} className="rounded-full bg-[#1d4e4b] px-5 hover:bg-[#0f2e2c]">
+                    Start a Call
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
-                {recentCalls.map((call) => (
+                {recentConversations.map((item) => (
                   <button
-                    key={call.id}
-                    onClick={() => setLocation(`/call/${call.sessionId}`)}
+                    key={item.id}
+                    onClick={() => setLocation(item.href)}
                     className="cg-soft-raise flex w-full items-center justify-between rounded-[1.3rem] border border-[#ddd3c4] bg-white/65 p-4 text-left"
                   >
                     <div className="flex items-center gap-4">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1d4e4b]/10">
-                        <Phone className="h-5 w-5 text-[#1d4e4b]" />
+                        {item.kind === "call" ? (
+                          <Phone className="h-5 w-5 text-[#1d4e4b]" />
+                        ) : (
+                          <MessageSquare className="h-5 w-5 text-[#1d4e4b]" />
+                        )}
                       </div>
                       <div>
                         <p className="font-medium capitalize text-[#0f2e2c]">
-                          {call.topicClassified ? call.topicClassified.replace(/_/g, " ") : "Voice call"}
+                          {item.title}
                         </p>
+                        {item.summary ? (
+                          <p className="mt-1 max-w-[32rem] truncate text-sm text-muted-foreground">{item.summary}</p>
+                        ) : null}
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {new Date(call.createdAt).toLocaleDateString(undefined, {
+                          {item.kind === "call" ? "Call" : "Chat"} ·{" "}
+                          {new Date(item.createdAt).toLocaleDateString(undefined, {
                             month: "short",
                             day: "numeric",
                             hour: "2-digit",
@@ -201,7 +278,7 @@ export default function Home() {
                         </p>
                       </div>
                     </div>
-                    <SafetyBadge result={call.safetyResult} />
+                    <SafetyBadge result={item.safetyResult} />
                   </button>
                 ))}
               </div>

@@ -63,10 +63,12 @@ type HistoryItem = {
 };
 
 export default function CallHistoryPage() {
-  const [, setLocation] = useLocation();
-  const [search, setSearch] = useState("");
-  const [safetyFilter, setSafetyFilter] = useState("all");
-  const [channelFilter, setChannelFilter] = useState("all");
+  const [location, setLocation] = useLocation();
+  const searchParams = useMemo(() => new URLSearchParams(window.location.search), [location]);
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [safetyFilter, setSafetyFilter] = useState(() => searchParams.get("safety") ?? "all");
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") ?? "all");
+  const [channelFilter, setChannelFilter] = useState(() => searchParams.get("channel") ?? "all");
 
   const { data: callHistory, isLoading: callsLoading } = trpc.calls.getCallHistory.useQuery({
     limit: 100,
@@ -124,10 +126,15 @@ export default function CallHistoryPage() {
         !search ||
         item.searchTokens.some((token) => token.toLowerCase().includes(search.toLowerCase()));
       const matchesSafety = safetyFilter === "all" || item.safetyResult === safetyFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "completed"
+          ? item.status === "completed" || item.status === "synced"
+          : item.status === statusFilter);
       const matchesChannel = channelFilter === "all" || item.kind === channelFilter;
-      return matchesSearch && matchesSafety && matchesChannel;
+      return matchesSearch && matchesSafety && matchesStatus && matchesChannel;
     });
-  }, [history, search, safetyFilter, channelFilter]);
+  }, [history, search, safetyFilter, statusFilter, channelFilter]);
 
   const stats = useMemo(() => ({
     total: history.length,
@@ -206,6 +213,17 @@ export default function CallHistoryPage() {
                   <SelectItem value="UNSAFE">Unsafe</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-44">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={channelFilter} onValueChange={setChannelFilter}>
                 <SelectTrigger className="w-full sm:w-44">
                   <SelectValue placeholder="Channel" />
@@ -224,7 +242,7 @@ export default function CallHistoryPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">
               {filtered.length} {filtered.length === 1 ? "conversation" : "conversations"}
-              {(search || safetyFilter !== "all" || channelFilter !== "all") && " (filtered)"}
+              {(search || safetyFilter !== "all" || statusFilter !== "all" || channelFilter !== "all") && " (filtered)"}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
