@@ -140,21 +140,26 @@ webhookRouter.post("/elevenlabs/consent", async (req, res) => {
   }
 
   const payload = unwrapWebhookPayload(req.body);
-  const { ghl_contact_id, conversation_id } = payload;
+  const ghlContactId =
+    payload?.ghl_contact_id ??
+    payload?.wibiz_contact_id ??
+    payload?.dynamic_variables?.ghl_contact_id ??
+    payload?.dynamic_variables?.wibiz_contact_id;
+  const conversationId = payload?.conversation_id ?? payload?.conversationId ?? "unknown";
 
-  if (!ghl_contact_id) {
-    return res.status(400).json({ error: "Missing ghl_contact_id" });
+  if (!ghlContactId) {
+    return res.status(400).json({ error: "Missing ghl_contact_id or wibiz_contact_id" });
   }
 
   const consentTimestamp = new Date();
 
-  console.log(`[Webhook] consent received for contact: ${ghl_contact_id}`);
+  console.log(`[Webhook] consent received for contact: ${ghlContactId}`);
 
   try {
     if (config.ghlApiKey) {
-      await addTagsToContact(config.ghlApiKey, ghl_contact_id, ["Consent Verified"]);
+      await addTagsToContact(config.ghlApiKey, ghlContactId, ["Consent Verified"]);
 
-      await updateContact(config.ghlApiKey, ghl_contact_id, {
+      await updateContact(config.ghlApiKey, ghlContactId, {
         customFields: [
           { key: "consent_given", value: "true" },
           { key: "consent_channel", value: "Voice" },
@@ -163,16 +168,16 @@ webhookRouter.post("/elevenlabs/consent", async (req, res) => {
       });
     }
 
-    await updateConsentForContact(ghl_contact_id, consentTimestamp);
+    await updateConsentForContact(ghlContactId, consentTimestamp);
 
-    console.log(`[Webhook] Consent verified for ${ghl_contact_id} at ${consentTimestamp.toISOString()}`);
+    console.log(`[Webhook] Consent verified for ${ghlContactId} at ${consentTimestamp.toISOString()}`);
     return res.status(200).json({ status: "consent_recorded" });
   } catch (err: any) {
     console.error("[Webhook] consent write failed:", err.message);
 
     try {
       await queueFailedSync({
-        conversationId: conversation_id ?? "unknown",
+        conversationId,
         webhookType: "consent",
         payload,
         errorMessage: err.message,

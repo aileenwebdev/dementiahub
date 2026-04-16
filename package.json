@@ -17,7 +17,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:deploy": "drizzle-kit push --force",
-    "backfill:portal-consent": "tsx scripts/backfillPortalConsent.ts"
+    "backfill:portal-consent": "tsx scripts/backfillPortalConsent.ts",
+    "backfill:chat-triage": "tsx scripts/backfillChatTriage.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",

@@ -250,9 +250,17 @@ export async function getPipelines(
 }
 
 export function extractCaregiversPipeline(
-  pipelines: GHLPipeline[]
+  pipelines: GHLPipeline[],
+  pipelineId?: string
 ): GHLPipeline | undefined {
-  return pipelines.find((p) => p.name === "Caregiver Cases");
+  if (pipelineId) {
+    const byId = pipelines.find((p) => p.id === pipelineId);
+    if (byId) return byId;
+  }
+  return (
+    pipelines.find((p) => p.name === "Caregiver Cases") ??
+    pipelines.find((p) => /case/i.test(p.name))
+  );
 }
 
 // ─── Conversation / Note Operations ─────────────────────────────────────────

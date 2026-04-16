@@ -27,6 +27,9 @@ export const config = {
   // GHL API
   ghlApiKey: normalizeBearerToken(process.env.GHL_API_KEY),
   ghlLocationId: normalizeEnvValue(process.env.GHL_LOCATION_ID),
+  // Cases pipeline - set GHL_CASES_PIPELINE_ID env var to override
+  ghlCasesPipelineId:
+    normalizeEnvValue(process.env.GHL_CASES_PIPELINE_ID) || "ybz3YPYHNnLwO90jm1ZP",
 
   // ElevenLabs API
   elevenLabsApiKey: normalizeBearerToken(process.env.ELEVENLABS_API_KEY),
