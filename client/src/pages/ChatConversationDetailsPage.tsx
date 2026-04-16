@@ -218,12 +218,12 @@ export default function ChatConversationDetailsPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                   <ExternalLink className="h-4 w-4 text-primary" />
-                  GHL Integration
+                  Wibiz Integration
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-0 divide-y divide-border">
                 <MetaRow
-                  label="GHL Synced"
+                  label="Wibiz Synced"
                   value={
                     conversation.ghlSynced ? (
                       <span className="flex items-center gap-1 text-emerald-600">

@@ -71,7 +71,7 @@ export default function AssistantPage() {
           <span className="text-white/84">{data?.conversation.topicClassified ?? "general"}</span>
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <span>GHL Sync</span>
+          <span>Wibiz Sync</span>
           <span className="text-white/84">{data?.conversation.ghlSynced ? "Synced" : "Pending"}</span>
         </div>
       </div>

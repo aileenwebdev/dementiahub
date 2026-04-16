@@ -320,7 +320,7 @@ export default function DemoDryRunPage() {
                   Governance note: if a KPI is not measured yet, mark it as pending live data instead of presenting it as finished.
                 </div>
                 <div className="flex items-center justify-between rounded-2xl bg-white/65 px-4 py-3 text-sm">
-                  <span>GHL connected</span>
+                  <span>Wibiz connected</span>
                   <ReadyPill ready={Boolean(integration.data?.ghl.connected)} />
                 </div>
               </CardContent>

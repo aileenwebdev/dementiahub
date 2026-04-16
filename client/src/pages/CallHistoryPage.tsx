@@ -167,7 +167,7 @@ export default function CallHistoryPage() {
             { label: "Safe", value: stats.safe, icon: Shield, color: "text-emerald-600" },
             { label: "Caution", value: stats.caution, icon: Clock, color: "text-amber-600" },
             { label: "Unsafe", value: stats.unsafe, icon: XCircle, color: "text-red-600" },
-            { label: "GHL Synced", value: stats.synced, icon: CheckCircle2, color: "text-emerald-600" },
+            { label: "Wibiz Synced", value: stats.synced, icon: CheckCircle2, color: "text-emerald-600" },
           ].map((stat) => (
             <Card key={stat.label}>
               <CardContent className="pb-3 pt-4">
@@ -251,7 +251,7 @@ export default function CallHistoryPage() {
                       <TableHead className={`w-[110px] ${stickyColumnClass.safety}`}>Safety</TableHead>
                       <TableHead className={`w-[110px] ${stickyColumnClass.status}`}>Status</TableHead>
                       <TableHead className="w-[95px]">Duration</TableHead>
-                      <TableHead className={`w-[90px] ${stickyColumnClass.sync}`}>GHL Sync</TableHead>
+                      <TableHead className={`w-[90px] ${stickyColumnClass.sync}`}>Wibiz Sync</TableHead>
                       <TableHead className={`w-[80px] ${stickyColumnClass.action}`}></TableHead>
                     </TableRow>
                   </TableHeader>

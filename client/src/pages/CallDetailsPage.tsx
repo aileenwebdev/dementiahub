@@ -296,7 +296,7 @@ export default function CallDetailsPage() {
                 />
                 {session.ghlContactId && (
                   <MetaRow
-                    label="Contact ID"
+                    label="Wibiz Contact ID"
                     value={
                       <span className="font-mono text-xs">{session.ghlContactId}</span>
                     }
@@ -304,7 +304,7 @@ export default function CallDetailsPage() {
                 )}
                 {session.ghlOpportunityId && (
                   <MetaRow
-                    label="Opportunity ID"
+                    label="Wibiz Opportunity ID"
                     value={
                       <span className="font-mono text-xs">{session.ghlOpportunityId}</span>
                     }
