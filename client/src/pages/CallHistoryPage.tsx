@@ -61,7 +61,10 @@ export default function CallHistoryPage() {
   const [safetyFilter, setSafetyFilter] = useState("all");
   const [channelFilter, setChannelFilter] = useState("all");
 
-  const { data: callHistory, isLoading: callsLoading } = trpc.calls.getCallHistory.useQuery({ limit: 100 });
+  const { data: callHistory, isLoading: callsLoading } = trpc.calls.getCallHistory.useQuery({
+    limit: 100,
+    source: "history_page",
+  });
   const { data: chatHistory, isLoading: chatsLoading } = trpc.ai.getConversationHistory.useQuery({ limit: 100 });
 
   const history = useMemo<HistoryItem[]>(() => {

@@ -23,6 +23,37 @@ export function normalizeBearerToken(value: string | undefined): string {
   return normalized.replace(/^Bearer\s+/i, "").trim();
 }
 
+function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
+  const normalized = normalizeEnvValue(value).toLowerCase();
+  if (!normalized) return fallback;
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
+function parseCsvEnv(value: string | undefined): string[] {
+  return normalizeEnvValue(value)
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+export function normalizePhoneForComparison(value: string | undefined): string {
+  return normalizeEnvValue(value).replace(/[^\d+]/g, "");
+}
+
+export function isApprovedOutboundQaNumber(
+  phoneNumber: string,
+  approvedNumbers: string[] = config.approvedQaPhoneNumbers
+): boolean {
+  const normalizedTarget = normalizePhoneForComparison(phoneNumber);
+  if (!normalizedTarget) return false;
+
+  return approvedNumbers
+    .map((candidate) => normalizePhoneForComparison(candidate))
+    .some((candidate) => candidate === normalizedTarget);
+}
+
 export const config = {
   // GHL API
   ghlApiKey: normalizeBearerToken(process.env.GHL_API_KEY),
@@ -47,6 +78,12 @@ export const config = {
 
   // App
   appUrl: normalizeEnvValue(process.env.APP_URL) || "http://localhost:3000",
+
+  // QA outbound call guardrails
+  voiceQaMode: parseBooleanEnv(process.env.VOICE_QA_MODE, true),
+  approvedQaPhoneNumbers: parseCsvEnv(
+    process.env.QA_APPROVED_PHONE_NUMBERS ?? process.env.VOICE_QA_APPROVED_NUMBERS
+  ),
 };
 
 /**

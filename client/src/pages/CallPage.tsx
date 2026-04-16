@@ -29,6 +29,7 @@ export default function CallPage() {
 
   const { data: setupStatus } = trpc.identity.checkSetupStatus.useQuery();
   const { data: identity } = trpc.identity.getMyIdentity.useQuery();
+  const { data: integrationStatus } = trpc.ghl.getIntegrationStatus.useQuery();
 
   const initiateCall = trpc.calls.initiateCall.useMutation({
     onSuccess: (data) => {
@@ -156,6 +157,21 @@ export default function CallPage() {
                           ElevenLabs calling is not configured yet. Use the browser voice call for now.
                         </p>
                       )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {integrationStatus?.voiceQaMode && (
+                <div className="rounded-[1.2rem] border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-red-900">QA outbound guard is on</p>
+                      <p className="text-xs text-red-700">
+                        Real phone dialing is blocked unless the number is on the server allowlist.
+                        Do not use patient numbers. Do not use unapproved numbers.
+                      </p>
                     </div>
                   </div>
                 </div>

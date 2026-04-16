@@ -1,14 +1,17 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { config } from "../config";
+import { config, isApprovedOutboundQaNumber } from "../config";
 import {
   createCallSession,
+  getPendingFailedSyncs,
   getCallSessionBySessionId,
   getCallSessionsByUserId,
   getIdentityByUserId,
   insertTranscriptChunk,
   getTranscriptsBySessionId,
+  markSyncResolved,
+  recordSyncRetryAttempt,
   updateCallSession,
 } from "../db";
 import {
@@ -41,10 +44,7 @@ async function trySyncFinishedElevenLabsCall<T extends Awaited<ReturnType<typeof
   }
 
   const conversation = await getConversation(config.elevenLabsApiKey, session.elevenlabsConversationId);
-  const normalizedStatus = conversation?.status?.toLowerCase?.() ?? "";
-  const isFinished = ["done", "completed", "ended"].includes(normalizedStatus);
-
-  if (!conversation || !isFinished) {
+  if (!conversation) {
     return session;
   }
 
@@ -59,6 +59,23 @@ async function trySyncFinishedElevenLabsCall<T extends Awaited<ReturnType<typeof
           time_in_call_secs: entry.time_in_call_secs,
         }));
 
+  const normalizedStatus = conversation.status?.toLowerCase?.() ?? "";
+  const hasCompletionArtifacts =
+    transcript.length > 0 ||
+    Boolean(conversation.analysis?.transcript_summary) ||
+    Boolean(conversation.call_duration_secs);
+  const isFinished =
+    ["done", "completed", "ended", "disconnected"].includes(normalizedStatus) ||
+    hasCompletionArtifacts;
+
+  if (!isFinished) {
+    return session;
+  }
+
+  console.log(
+    `[Calls] recovery sync starting session=${session.sessionId} conversation=${session.elevenlabsConversationId} status=${normalizedStatus || "unknown"} transcript_chunks=${transcript.length}`
+  );
+
   await processPostCallWebhook(
     await synthesizePostCallPayloadFromConversation(
       {
@@ -70,6 +87,45 @@ async function trySyncFinishedElevenLabsCall<T extends Awaited<ReturnType<typeof
   );
 
   return (await getCallSessionBySessionId(session.sessionId)) as T;
+}
+
+function assertOutboundQaAllowed(phoneNumber: string) {
+  if (!config.voiceQaMode) return;
+  if (!config.approvedQaPhoneNumbers.length) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message:
+        "Outbound phone QA is locked. Add approved test numbers in QA_APPROVED_PHONE_NUMBERS before dialing.",
+    });
+  }
+  if (!isApprovedOutboundQaNumber(phoneNumber)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message:
+        "Outbound phone QA blocks this number. Use an approved test number only.",
+    });
+  }
+}
+
+async function retryFailedPostCallSyncs(limit = 5) {
+  const queued = await getPendingFailedSyncs(limit);
+  const postCallItems = queued.filter((item) => item.webhookType === "post_call");
+
+  for (const item of postCallItems) {
+    try {
+      await processPostCallWebhook(item.payload as any);
+      await markSyncResolved(item.id);
+      console.log(
+        `[Calls] replayed failed post-call sync queue_id=${item.id} conversation=${item.conversationId}`
+      );
+    } catch (error: any) {
+      await recordSyncRetryAttempt(item.id, (item.retryCount ?? 0) + 1, error?.message);
+      console.error(
+        `[Calls] failed post-call replay queue_id=${item.id} conversation=${item.conversationId}:`,
+        error
+      );
+    }
+  }
 }
 
 function toBrowserCallContext(params: {
@@ -119,6 +175,7 @@ export const callsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user.id;
+      const dialNumber = input.phoneNumber.trim();
 
       if (!config.elevenLabsApiKey || !config.elevenLabsAgentId) {
         throw new TRPCError({
@@ -137,13 +194,15 @@ export const callsRouter = router({
         });
       }
 
+      assertOutboundQaAllowed(dialNumber);
+
       // Generate session ID
       const sessionId = `sess_${Date.now()}_${userId}`;
 
       // Initiate ElevenLabs call
       const result = await initiateOutboundCall(config.elevenLabsApiKey, {
         agentId: config.elevenLabsAgentId,
-        phoneNumber: input.phoneNumber,
+        phoneNumber: dialNumber,
         dynamicVariables: {
           ghl_contact_id: identity.ghlContactId,
           ghl_location_id: identity.ghlLocationId ?? config.ghlLocationId,
@@ -171,6 +230,10 @@ export const callsRouter = router({
         callStartTime: new Date(),
       });
 
+      console.log(
+        `[Calls] call started mode=phone session=${sessionId} conversation=${result.conversation_id} user=${userId} qa_mode=${config.voiceQaMode}`
+      );
+
       return {
         sessionId,
         conversationId: result.conversation_id,
@@ -193,6 +256,8 @@ export const callsRouter = router({
       status: "active",
       callStartTime: new Date(),
     });
+
+    console.log(`[Calls] call started mode=browser session=${sessionId} user=${userId}`);
 
     return {
       sessionId,
@@ -270,6 +335,10 @@ export const callsRouter = router({
         elevenlabsAgentId: config.elevenLabsAgentId || session.elevenlabsAgentId,
       });
 
+      console.log(
+        `[Calls] browser conversation bound session=${input.sessionId} conversation=${input.conversationId}`
+      );
+
       return { success: true } as const;
     }),
 
@@ -300,6 +369,10 @@ export const callsRouter = router({
         timestamp: new Date(input.timestamp),
       });
 
+      console.log(
+        `[Calls] transcript saved mode=browser session=${input.sessionId} speaker=${input.speaker}`
+      );
+
       if (input.conversationId && !session.elevenlabsConversationId) {
         await updateCallSession(input.sessionId, {
           elevenlabsConversationId: input.conversationId,
@@ -316,11 +389,28 @@ export const callsRouter = router({
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(50),
+        source: z.string().min(1).max(50).optional(),
       }).optional()
     )
     .query(async ({ ctx, input }) => {
+      console.log(
+        `[Calls] dashboard refresh source=${input?.source ?? "unspecified"} user=${ctx.user.id} limit=${input?.limit ?? 50}`
+      );
+      await retryFailedPostCallSyncs(5);
       const sessions = await getCallSessionsByUserId(ctx.user.id, input?.limit ?? 50);
-      return Promise.all(sessions.map((session) => trySyncFinishedElevenLabsCall(session)));
+      return Promise.all(
+        sessions.map(async (session) => {
+          try {
+            return await trySyncFinishedElevenLabsCall(session);
+          } catch (error) {
+            console.error(
+              `[Calls] recovery sync failed session=${session.sessionId} conversation=${session.elevenlabsConversationId}:`,
+              error
+            );
+            return session;
+          }
+        })
+      );
     }),
 
   /**
@@ -401,6 +491,8 @@ export const callsRouter = router({
         callEndTime: new Date(),
       });
 
+      console.log(`[Calls] call marked completed manually session=${input.sessionId}`);
+
       return { success: true };
     }),
 
@@ -467,6 +559,10 @@ export const callsRouter = router({
         transcriptRaw,
       });
 
+      console.log(
+        `[Calls] call marked completed mode=browser-demo session=${input.sessionId} safety=${input.safetyResult} callback=${input.callbackRequested}`
+      );
+
       return { success: true } as const;
     }),
 
@@ -491,6 +587,7 @@ export const callsRouter = router({
           content: chunk.text,
         }))
       );
+      console.log(`[Calls] safety started mode=browser session=${input.sessionId}`);
       const endTime = new Date();
       const startedAt = session.callStartTime ? new Date(session.callStartTime).getTime() : Date.now();
       const durationSeconds = Math.max(1, Math.round((endTime.getTime() - startedAt) / 1000));
@@ -511,6 +608,17 @@ export const callsRouter = router({
         resolutionType: transcriptChunks.length ? triage.resolutionType : "browser_voice_demo",
         escalationTriggered: triage.escalationTriggered,
       });
+
+      console.log(
+        `[Calls] safety completed mode=browser session=${input.sessionId} result=${triage.safetyResult} callback=${triage.callbackRequested}`
+      );
+      if (triage.callbackRequested) {
+        console.log(`[Calls] callback flag set mode=browser session=${input.sessionId}`);
+      }
+      if (triage.safetyResult === "SAFE") {
+        console.log(`[Calls] safe flag set mode=browser session=${input.sessionId}`);
+      }
+      console.log(`[Calls] call marked completed mode=browser session=${input.sessionId}`);
 
       return { success: true } as const;
     }),

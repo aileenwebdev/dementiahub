@@ -70,7 +70,7 @@ export const ghlRouter = router({
     if (ghlConfigured) {
       try {
         const pipelines = await getCachedPipelines();
-        ghlConnected = pipelines.length >= 0; // successful fetch = connected
+        ghlConnected = Array.isArray(pipelines);
       } catch {
         ghlConnected = false;
       }
@@ -86,6 +86,8 @@ export const ghlRouter = router({
         configured: elevenLabsConfigured,
         agentId: config.elevenLabsAgentId || null,
       },
+      voiceQaMode: config.voiceQaMode,
+      approvedQaPhoneNumbersConfigured: config.approvedQaPhoneNumbers.length > 0,
       webhookUrl: `${config.appUrl}/api/webhooks/elevenlabs/post-call`,
       consentWebhookUrl: `${config.appUrl}/api/webhooks/elevenlabs/consent`,
     };

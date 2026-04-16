@@ -28,7 +28,10 @@ function StatusIndicator({ ok, label }: { ok: boolean; label: string }) {
 export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const { data: callHistory } = trpc.calls.getCallHistory.useQuery({ limit: 5 });
+  const { data: callHistory } = trpc.calls.getCallHistory.useQuery({
+    limit: 5,
+    source: "dashboard_home",
+  });
   const { data: integrationStatus } = trpc.ghl.getIntegrationStatus.useQuery();
   const { data: setupStatus } = trpc.identity.checkSetupStatus.useQuery();
   const { data: identity } = trpc.identity.getMyIdentity.useQuery();

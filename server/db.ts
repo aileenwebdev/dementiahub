@@ -269,6 +269,23 @@ export async function markSyncResolved(id: number): Promise<void> {
   await db.update(failedSyncQueue).set({ resolved: true }).where(eq(failedSyncQueue.id, id));
 }
 
+export async function recordSyncRetryAttempt(
+  id: number,
+  retryCount: number,
+  errorMessage?: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(failedSyncQueue)
+    .set({
+      retryCount,
+      lastRetryAt: new Date(),
+      errorMessage,
+    })
+    .where(eq(failedSyncQueue.id, id));
+}
+
 // AI Chat Operations
 
 export async function getActiveAIChatConversationByUserId(portalUserId: number) {

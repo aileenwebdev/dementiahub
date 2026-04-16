@@ -3,7 +3,9 @@ import {
   config,
   isElevenLabsConfigured,
   isGHLConfigured,
+  isApprovedOutboundQaNumber,
   normalizeBearerToken,
+  normalizePhoneForComparison,
   verifyElevenLabsWebhookSecret,
 } from "./config";
 
@@ -57,5 +59,20 @@ describe("config", () => {
     expect(normalizeBearerToken("Bearer pit-123")).toBe("pit-123");
     expect(normalizeBearerToken("  'pit-456'  ")).toBe("pit-456");
     expect(normalizeBearerToken('  "pit-789"  ')).toBe("pit-789");
+  });
+
+  it("normalizes phone numbers for QA comparisons", () => {
+    expect(normalizePhoneForComparison("+65 9123 4567")).toBe("+6591234567");
+    expect(normalizePhoneForComparison(" 9123-4567 ")).toBe("91234567");
+  });
+
+  it("matches approved QA numbers after formatting cleanup", () => {
+    expect(isApprovedOutboundQaNumber("+65 9123 4567", ["+6591234567"])).toBe(true);
+    expect(isApprovedOutboundQaNumber("+65 9999 9999", ["+6591234567"])).toBe(false);
+  });
+
+  it("exposes QA outbound guardrails in config", () => {
+    expect(typeof config.voiceQaMode).toBe("boolean");
+    expect(Array.isArray(config.approvedQaPhoneNumbers)).toBe(true);
   });
 });
