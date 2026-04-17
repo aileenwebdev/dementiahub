@@ -27,12 +27,33 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
+export function hasStaffAccess(role: string | null | undefined) {
+  return role === "admin" || role === "staff";
+}
+
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
     if (!ctx.user || ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    });
+  }),
+);
+
+export const staffProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+
+    if (!ctx.user || !hasStaffAccess(ctx.user.role)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Staff or admin access required" });
     }
 
     return next({

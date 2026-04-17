@@ -127,13 +127,13 @@ export default function Home() {
               <Button onClick={() => setLocation("/assistant")} className="h-11 rounded-full bg-[#1d4e4b] px-5 hover:bg-[#0f2e2c]">
                 Open Assistant
               </Button>
-              {user?.role === "admin" && (
+              {(user?.role === "admin" || user?.role === "staff") && (
                 <Button
                   variant="outline"
-                  onClick={() => setLocation("/demo/dry-run")}
+                  onClick={() => setLocation(user.role === "admin" ? "/demo/dry-run" : "/portal/staff")}
                   className="h-11 rounded-full border-[#1d4e4b]/15 bg-white/70 px-5 text-[#1d4e4b] hover:bg-white"
                 >
-                  Open Dry Run Center
+                  {user?.role === "admin" ? "Open Dry Run Center" : "Open Staff Portal"}
                 </Button>
               )}
             </div>
@@ -331,7 +331,9 @@ export default function Home() {
                   { label: "Start a new call", action: () => setLocation("/call") },
                   ...(user?.role === "admin"
                     ? [{ label: "Preview staff portal", action: () => setLocation("/portal/staff") }]
-                    : []),
+                    : user?.role === "staff"
+                      ? [{ label: "Open staff portal", action: () => setLocation("/portal/staff") }]
+                      : []),
                 ].map((item) => (
                   <button
                     key={item.label}

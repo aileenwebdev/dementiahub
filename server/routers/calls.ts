@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { hasStaffAccess, protectedProcedure, router } from "../_core/trpc";
 import { config, isApprovedOutboundQaNumber } from "../config";
 import {
   createCallSession,
@@ -274,7 +274,7 @@ export const callsRouter = router({
       if (!session) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
       }
-      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (session.portalUserId !== ctx.user.id && !hasStaffAccess(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
       if (!config.elevenLabsApiKey || !config.elevenLabsAgentId) {
@@ -326,7 +326,7 @@ export const callsRouter = router({
       if (!session) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
       }
-      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (session.portalUserId !== ctx.user.id && !hasStaffAccess(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
@@ -357,7 +357,7 @@ export const callsRouter = router({
       if (!session) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
       }
-      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (session.portalUserId !== ctx.user.id && !hasStaffAccess(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
@@ -427,7 +427,7 @@ export const callsRouter = router({
       }
 
       // Ensure the call belongs to the current user
-      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (session.portalUserId !== ctx.user.id && !hasStaffAccess(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
@@ -482,7 +482,7 @@ export const callsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const session = await getCallSessionBySessionId(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND" });
-      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (session.portalUserId !== ctx.user.id && !hasStaffAccess(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -520,7 +520,7 @@ export const callsRouter = router({
       if (!session) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
       }
-      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (session.portalUserId !== ctx.user.id && !hasStaffAccess(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
       if (!session.elevenlabsConversationId?.startsWith("web_demo_")) {
@@ -573,7 +573,7 @@ export const callsRouter = router({
       if (!session) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Call session not found" });
       }
-      if (session.portalUserId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (session.portalUserId !== ctx.user.id && !hasStaffAccess(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 

@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
-import { ENV, isAdminEmail } from "./_core/env";
+import { ENV, resolvePortalRole } from "./_core/env";
 import { hashPassword, sdk, verifyPassword } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -37,7 +37,7 @@ export const appRouter = router({
 
         const openId = nanoid();
         const passwordHash = await hashPassword(input.password);
-        const isAdmin = isAdminEmail(input.email);
+        const role = resolvePortalRole(input.email);
 
         await db.upsertUser({
           openId,
@@ -46,7 +46,7 @@ export const appRouter = router({
           passwordHash,
           loginMethod: "email",
           lastSignedIn: new Date(),
-          role: isAdmin ? "admin" : "user",
+          role,
         });
 
         const token = await sdk.createSessionToken(openId, {
@@ -79,7 +79,7 @@ export const appRouter = router({
         const user = await db.getUserByEmail(input.email);
         const invalid = !user || !user.passwordHash;
         const passwordOk = invalid ? false : await verifyPassword(input.password, user!.passwordHash!);
-        const isAdmin = isAdminEmail(input.email);
+        const role = resolvePortalRole(input.email);
 
         if (!passwordOk) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
@@ -97,7 +97,7 @@ export const appRouter = router({
         await db.upsertUser({
           openId: user!.openId,
           lastSignedIn: new Date(),
-          role: isAdmin ? "admin" : user!.role,
+          role: role === "user" ? user!.role : role,
         });
         return { success: true } as const;
       }),

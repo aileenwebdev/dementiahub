@@ -27,6 +27,12 @@ const adminMenuItems = [
   { icon: User, label: "My Profile", path: "/profile" },
 ];
 
+const staffMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Activity, label: "Staff Portal", path: "/portal/staff" },
+  { icon: User, label: "My Profile", path: "/profile" },
+];
+
 export default function DashboardLayout({
   children,
   sidebar,
@@ -61,7 +67,8 @@ export default function DashboardLayout({
     );
   }
 
-  const visibleItems = user.role === "admin" ? adminMenuItems : caregiverMenuItems;
+  const visibleItems =
+    user.role === "admin" ? adminMenuItems : user.role === "staff" ? staffMenuItems : caregiverMenuItems;
 
   return (
     <div className="min-h-screen bg-transparent">

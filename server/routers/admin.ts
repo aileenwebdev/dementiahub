@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { adminProcedure, router } from "../_core/trpc";
+import { adminProcedure, router, staffProcedure } from "../_core/trpc";
 import { config } from "../config";
 import {
   getAdminOverviewStats,
   getAdminRecentAIConversations,
   getAdminRecentCallSessions,
+  getAdminStaffDashboard,
   getAdminUserDetail,
   getAdminUsers,
   getPendingFailedSyncs,
@@ -30,6 +31,10 @@ export const adminRouter = router({
       recentChats,
       failedSyncs,
     };
+  }),
+
+  staffDashboard: staffProcedure.query(async () => {
+    return getAdminStaffDashboard(60);
   }),
 
   users: adminProcedure

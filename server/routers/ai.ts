@@ -13,7 +13,7 @@ import {
   touchAIChatConversation,
   updateAIChatConversation,
 } from "../db";
-import { protectedProcedure, router } from "../_core/trpc";
+import { hasStaffAccess, protectedProcedure, router } from "../_core/trpc";
 import { getSignedConversationUrl } from "../services/elevenlabs";
 import { triageConversation } from "../services/conversationTriage";
 import { syncChatConversationToGHL } from "../services/chatSync";
@@ -363,14 +363,17 @@ export const aiRouter = router({
     .input(z.object({ conversationId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       const conversation = await getAIChatConversationById(input.conversationId);
-      if (!conversation || conversation.portalUserId !== ctx.user.id) {
+      if (
+        !conversation ||
+        (conversation.portalUserId !== ctx.user.id && !hasStaffAccess(ctx.user.role))
+      ) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Chat conversation not found" });
       }
 
-      const identity = await getIdentityByUserId(ctx.user.id);
+      const identity = await getIdentityByUserId(conversation.portalUserId);
       const refreshed = await refreshConversationTriage({
         conversationId: conversation.id,
-        portalUserId: ctx.user.id,
+        portalUserId: conversation.portalUserId,
         identity,
       });
       return {

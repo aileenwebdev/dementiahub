@@ -563,3 +563,82 @@ export async function getAdminRecentAIConversations(limit = 20) {
     }))
   );
 }
+
+export async function getAdminStaffDashboard(limit = 50) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      urgentCalls: [],
+      callbackCalls: [],
+      activeCalls: [],
+      unsafeChats: [],
+      chatSupportQueue: [],
+      needsStaffTotal: 0,
+    };
+  }
+
+  const [callRows, chatRows] = await Promise.all([
+    db
+      .select({
+        call: callSessions,
+        user: users,
+      })
+      .from(callSessions)
+      .leftJoin(users, eq(users.id, callSessions.portalUserId))
+      .orderBy(desc(callSessions.updatedAt))
+      .limit(limit),
+    db
+      .select({
+        conversation: aiChatConversations,
+        user: users,
+      })
+      .from(aiChatConversations)
+      .leftJoin(users, eq(users.id, aiChatConversations.portalUserId))
+      .orderBy(desc(aiChatConversations.updatedAt))
+      .limit(limit),
+  ]);
+
+  const chatsWithMessages = await Promise.all(
+    chatRows.map(async (row) => ({
+      ...row,
+      messages: await getAIChatMessagesByConversationId(row.conversation.id, 1),
+    }))
+  );
+
+  const needsStaffCall = (row: (typeof callRows)[number]) =>
+    row.call.safetyResult === "UNSAFE" ||
+    row.call.safetyResult === "CAUTION" ||
+    Boolean(row.call.callbackRequested) ||
+    Boolean(row.call.escalationTriggered) ||
+    row.call.status === "active" ||
+    (!!row.call.resolutionType && row.call.resolutionType !== "self_serve");
+
+  const needsStaffChat = (row: (typeof chatsWithMessages)[number]) =>
+    row.conversation.safetyResult === "UNSAFE" ||
+    row.conversation.safetyResult === "CAUTION" ||
+    Boolean(row.conversation.callbackRequested) ||
+    Boolean(row.conversation.escalationTriggered) ||
+    row.conversation.status === "active" ||
+    (!!row.conversation.resolutionType && row.conversation.resolutionType !== "self_serve");
+
+  const urgentCalls = callRows.filter(
+    (row) => row.call.safetyResult === "UNSAFE" || Boolean(row.call.escalationTriggered)
+  );
+  const callbackCalls = callRows.filter((row) => Boolean(row.call.callbackRequested));
+  const activeCalls = callRows.filter((row) => row.call.status === "active");
+  const unsafeChats = chatsWithMessages.filter(
+    (row) =>
+      row.conversation.safetyResult === "UNSAFE" || Boolean(row.conversation.escalationTriggered)
+  );
+  const chatSupportQueue = chatsWithMessages.filter(needsStaffChat);
+
+  return {
+    urgentCalls,
+    callbackCalls,
+    activeCalls,
+    unsafeChats,
+    chatSupportQueue,
+    needsStaffTotal:
+      callRows.filter(needsStaffCall).length + chatsWithMessages.filter(needsStaffChat).length,
+  };
+}
