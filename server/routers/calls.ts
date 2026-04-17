@@ -227,6 +227,8 @@ export const callsRouter = router({
         elevenlabsConversationId: result.conversation_id,
         elevenlabsAgentId: config.elevenLabsAgentId,
         status: "active",
+        caseStatus: "new",
+        casePriority: "normal",
         callStartTime: new Date(),
       });
 
@@ -254,6 +256,8 @@ export const callsRouter = router({
       ghlLocationId: identity?.ghlLocationId ?? config.ghlLocationId,
       elevenlabsAgentId: config.elevenLabsAgentId || "browser-call",
       status: "active",
+      caseStatus: "new",
+      casePriority: "normal",
       callStartTime: new Date(),
     });
 
@@ -489,6 +493,8 @@ export const callsRouter = router({
       await updateCallSession(input.sessionId, {
         status: "completed",
         callEndTime: new Date(),
+        caseStatus: "resolved",
+        resolvedAt: new Date(),
       });
 
       console.log(`[Calls] call marked completed manually session=${input.sessionId}`);
@@ -556,6 +562,20 @@ export const callsRouter = router({
         consentVerballyConfirmed: input.consentVerballyConfirmed,
         consentTimestamp: input.consentVerballyConfirmed ? new Date(endedAt) : null,
         escalationTriggered: input.safetyResult === "UNSAFE",
+        caseStatus:
+          input.safetyResult === "UNSAFE"
+            ? "escalated"
+            : input.callbackRequested
+              ? "pending_callback"
+              : "resolved",
+        casePriority:
+          input.safetyResult === "UNSAFE"
+            ? "urgent"
+            : input.callbackRequested
+              ? "high"
+              : "normal",
+        resolvedAt:
+          input.safetyResult === "UNSAFE" || input.callbackRequested ? null : new Date(endedAt),
         transcriptRaw,
       });
 
@@ -607,6 +627,20 @@ export const callsRouter = router({
         consentVerballyConfirmed: triage.consentVerballyConfirmed,
         resolutionType: transcriptChunks.length ? triage.resolutionType : "browser_voice_demo",
         escalationTriggered: triage.escalationTriggered,
+        caseStatus:
+          triage.safetyResult === "UNSAFE" || triage.escalationTriggered
+            ? "escalated"
+            : triage.callbackRequested
+              ? "pending_callback"
+              : "resolved",
+        casePriority:
+          triage.safetyResult === "UNSAFE"
+            ? "urgent"
+            : triage.safetyResult === "CAUTION" || triage.callbackRequested
+              ? "high"
+              : "normal",
+        resolvedAt:
+          triage.safetyResult === "UNSAFE" || triage.callbackRequested ? null : endTime,
       });
 
       console.log(

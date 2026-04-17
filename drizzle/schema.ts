@@ -76,6 +76,25 @@ export const callSessions = mysqlTable("call_sessions", {
   callSummary: text("call_summary"),
   resolutionType: varchar("resolution_type", { length: 50 }),
   escalationTriggered: boolean("escalation_triggered").default(false),
+  caseStatus: mysqlEnum("case_status", [
+    "new",
+    "open",
+    "in_progress",
+    "pending_callback",
+    "pending_caregiver",
+    "pending_internal",
+    "resolved",
+    "closed",
+    "escalated",
+  ]).default("new").notNull(),
+  casePriority: mysqlEnum("case_priority", ["low", "normal", "high", "urgent"]).default("normal").notNull(),
+  assignedStaffUserId: int("assigned_staff_user_id"),
+  humanTakeover: boolean("human_takeover").default(false).notNull(),
+  humanTakeoverAt: timestamp("human_takeover_at"),
+  lastStaffResponseAt: timestamp("last_staff_response_at"),
+  lastCaregiverResponseAt: timestamp("last_caregiver_response_at"),
+  resolutionNotes: text("resolution_notes"),
+  resolvedAt: timestamp("resolved_at"),
   asrConfidence: varchar("asr_confidence", { length: 20 }),
   transcriptRaw: text("transcript_raw"),
   // Sync status
@@ -141,6 +160,25 @@ export const aiChatConversations = mysqlTable("ai_chat_conversations", {
   conversationSummary: text("conversation_summary"),
   resolutionType: varchar("resolution_type", { length: 50 }),
   escalationTriggered: boolean("escalation_triggered").default(false),
+  caseStatus: mysqlEnum("case_status", [
+    "new",
+    "open",
+    "in_progress",
+    "pending_callback",
+    "pending_caregiver",
+    "pending_internal",
+    "resolved",
+    "closed",
+    "escalated",
+  ]).default("new").notNull(),
+  casePriority: mysqlEnum("case_priority", ["low", "normal", "high", "urgent"]).default("normal").notNull(),
+  assignedStaffUserId: int("assigned_staff_user_id"),
+  humanTakeover: boolean("human_takeover").default(false).notNull(),
+  humanTakeoverAt: timestamp("human_takeover_at"),
+  lastStaffResponseAt: timestamp("last_staff_response_at"),
+  lastCaregiverResponseAt: timestamp("last_caregiver_response_at"),
+  resolutionNotes: text("resolution_notes"),
+  resolvedAt: timestamp("resolved_at"),
   ghlSynced: boolean("ghl_synced").default(false),
   ghlSyncedAt: timestamp("ghl_synced_at"),
   ghlSyncError: text("ghl_sync_error"),
@@ -160,10 +198,39 @@ export const aiChatMessages = mysqlTable("ai_chat_messages", {
   id: int("id").autoincrement().primaryKey(),
   conversationId: int("conversation_id").notNull(),
   portalUserId: int("portal_user_id").notNull(),
-  role: mysqlEnum("role", ["system", "user", "assistant"]).notNull(),
+  role: mysqlEnum("role", ["system", "user", "assistant", "staff"]).notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type AIChatMessage = typeof aiChatMessages.$inferSelect;
 export type InsertAIChatMessage = typeof aiChatMessages.$inferInsert;
+
+/**
+ * Callback attempts logged by staff when they follow up with a caregiver by phone.
+ */
+export const callbackAttempts = mysqlTable("callback_attempts", {
+  id: int("id").autoincrement().primaryKey(),
+  portalUserId: int("portal_user_id").notNull(),
+  staffUserId: int("staff_user_id"),
+  conversationId: int("conversation_id"),
+  sessionId: varchar("session_id", { length: 100 }),
+  phoneNumber: varchar("phone_number", { length: 30 }).notNull(),
+  status: mysqlEnum("status", [
+    "scheduled",
+    "attempted",
+    "connected",
+    "no_answer",
+    "left_voicemail",
+    "invalid_number",
+    "cancelled",
+  ]).default("attempted").notNull(),
+  notes: text("notes"),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CallbackAttempt = typeof callbackAttempts.$inferSelect;
+export type InsertCallbackAttempt = typeof callbackAttempts.$inferInsert;

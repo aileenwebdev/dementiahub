@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Loader2, Send, User, Sparkles } from "lucide-react";
+import { Headphones, Loader2, Send, User, Sparkles } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
 
@@ -10,7 +10,7 @@ import { Streamdown } from "streamdown";
  * Message type matching server-side LLM Message interface
  */
 export type Message = {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "staff";
   content: string;
 };
 
@@ -246,9 +246,13 @@ export function AIChatBox({
                         : undefined
                     }
                   >
-                    {message.role === "assistant" && (
+                    {(message.role === "assistant" || message.role === "staff") && (
                       <div className="size-8 shrink-0 mt-1 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Sparkles className="size-4 text-primary" />
+                        {message.role === "staff" ? (
+                          <Headphones className="size-4 text-sky-700" />
+                        ) : (
+                          <Sparkles className="size-4 text-primary" />
+                        )}
                       </div>
                     )}
 
@@ -257,12 +261,21 @@ export function AIChatBox({
                         "max-w-[80%] rounded-[1.2rem] px-4 py-3",
                         message.role === "user"
                           ? "bg-[#1d4e4b] text-white"
-                          : "bg-[#ede7dc] text-foreground"
+                          : message.role === "staff"
+                            ? "border border-sky-200 bg-sky-50 text-sky-950"
+                            : "bg-[#ede7dc] text-foreground"
                       )}
                     >
                       {message.role === "assistant" ? (
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                           <Streamdown>{message.content}</Streamdown>
+                        </div>
+                      ) : message.role === "staff" ? (
+                        <div>
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">
+                            Human staff
+                          </p>
+                          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap text-sm">

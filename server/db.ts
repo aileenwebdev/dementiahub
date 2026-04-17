@@ -3,11 +3,13 @@ import { drizzle } from "drizzle-orm/mysql2";
 import {
   aiChatConversations,
   aiChatMessages,
+  callbackAttempts,
   callSessions,
   callTranscripts,
   failedSyncQueue,
   InsertAIChatConversation,
   InsertAIChatMessage,
+  InsertCallbackAttempt,
   InsertCallSession,
   InsertCallTranscript,
   InsertFailedSyncQueue,
@@ -370,6 +372,120 @@ export async function getAIChatMessagesByConversationId(conversationId: number, 
     .where(eq(aiChatMessages.conversationId, conversationId))
     .orderBy(aiChatMessages.createdAt)
     .limit(limit);
+}
+
+export async function createCallbackAttempt(data: InsertCallbackAttempt) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(callbackAttempts).values(data).$returningId();
+  return result[0]?.id;
+}
+
+export async function getCallbackAttemptsForCase(params: {
+  portalUserId: number;
+  conversationId?: number | null;
+  sessionId?: string | null;
+  limit?: number;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const limit = params.limit ?? 50;
+  const filters = [eq(callbackAttempts.portalUserId, params.portalUserId)];
+
+  if (params.conversationId) {
+    filters.push(eq(callbackAttempts.conversationId, params.conversationId));
+  }
+  if (params.sessionId) {
+    filters.push(eq(callbackAttempts.sessionId, params.sessionId));
+  }
+
+  return db
+    .select({
+      attempt: callbackAttempts,
+      staffUser: users,
+    })
+    .from(callbackAttempts)
+    .leftJoin(users, eq(users.id, callbackAttempts.staffUserId))
+    .where(and(...filters))
+    .orderBy(desc(callbackAttempts.createdAt))
+    .limit(limit);
+}
+
+export async function getSupportConversationCase(conversationId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db
+    .select({
+      conversation: aiChatConversations,
+      caregiver: users,
+      identity: userIdentityMap,
+    })
+    .from(aiChatConversations)
+    .leftJoin(users, eq(users.id, aiChatConversations.portalUserId))
+    .leftJoin(userIdentityMap, eq(userIdentityMap.portalUserId, aiChatConversations.portalUserId))
+    .where(eq(aiChatConversations.id, conversationId))
+    .limit(1);
+
+  if (!rows[0]) return null;
+
+  const [messages, callbacks, assignedStaff] = await Promise.all([
+    getAIChatMessagesByConversationId(conversationId, 200),
+    getCallbackAttemptsForCase({
+      portalUserId: rows[0].conversation.portalUserId,
+      conversationId,
+      limit: 100,
+    }),
+    rows[0].conversation.assignedStaffUserId
+      ? getUserById(rows[0].conversation.assignedStaffUserId)
+      : Promise.resolve(undefined),
+  ]);
+
+  return {
+    ...rows[0],
+    assignedStaff,
+    messages,
+    callbacks,
+  };
+}
+
+export async function getSupportCallCase(sessionId: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db
+    .select({
+      session: callSessions,
+      caregiver: users,
+      identity: userIdentityMap,
+    })
+    .from(callSessions)
+    .leftJoin(users, eq(users.id, callSessions.portalUserId))
+    .leftJoin(userIdentityMap, eq(userIdentityMap.portalUserId, callSessions.portalUserId))
+    .where(eq(callSessions.sessionId, sessionId))
+    .limit(1);
+
+  if (!rows[0]) return null;
+
+  const [callbacks, transcriptChunks, assignedStaff] = await Promise.all([
+    getCallbackAttemptsForCase({
+      portalUserId: rows[0].session.portalUserId,
+      sessionId,
+      limit: 100,
+    }),
+    getTranscriptsBySessionId(sessionId),
+    rows[0].session.assignedStaffUserId
+      ? getUserById(rows[0].session.assignedStaffUserId)
+      : Promise.resolve(undefined),
+  ]);
+
+  return {
+    ...rows[0],
+    assignedStaff,
+    transcriptChunks,
+    callbacks,
+  };
 }
 
 // Admin Operations

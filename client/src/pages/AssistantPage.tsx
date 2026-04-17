@@ -1,21 +1,39 @@
+import { AIChatBox, type Message as PortalMessage } from "@/components/AIChatBox";
 import DashboardLayout from "@/components/DashboardLayout";
 import { ElevenLabsChatBox } from "@/components/ElevenLabsChatBox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Brain, MessagesSquare, Shield, UserRound } from "lucide-react";
+import { Brain, Headphones, MessagesSquare, Shield, UserRound } from "lucide-react";
+import { toast } from "sonner";
 
 export default function AssistantPage() {
+  const dataQueryUtils = trpc.useUtils();
   const { data } = trpc.ai.getMyConversation.useQuery(undefined, {
-    staleTime: 1000 * 60 * 10,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 1000 * 10,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
   const { data: identity } = trpc.identity.getMyIdentity.useQuery(undefined, {
     staleTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
+  const appendPortalMessage = trpc.ai.appendPortalMessage.useMutation({
+    onSuccess: () => {
+      void dataQueryUtils.ai.getMyConversation.invalidate();
+    },
+    onError: (error) => toast.error("Could not send message", { description: error.message }),
+  });
+
+  const humanSupportMessages: PortalMessage[] =
+    data?.messages
+      .filter((message) => message.role !== "system")
+      .map((message) => ({
+        role: message.role as "user" | "assistant" | "staff",
+        content: message.content,
+      })) ?? [];
 
   const sidebar = (
     <div className="cg-sidebar-card sticky top-[104px] rounded-[1.6rem] p-6">
@@ -74,6 +92,10 @@ export default function AssistantPage() {
           <span>Wibiz Sync</span>
           <span className="text-white/84">{data?.conversation.ghlSynced ? "Synced" : "Pending"}</span>
         </div>
+        <div className="mt-3 flex items-center justify-between">
+          <span>Human takeover</span>
+          <span className="text-white/84">{data?.conversation.humanTakeover ? "Active" : "AI handling"}</span>
+        </div>
       </div>
     </div>
   );
@@ -130,26 +152,50 @@ export default function AssistantPage() {
         <Card className="cg-panel overflow-hidden rounded-[2rem] border-0">
           <CardHeader className="border-b border-[#ddd3c4] bg-white/35 px-6 py-5">
             <CardTitle className="flex items-center gap-2 text-xl text-[#0f2e2c]">
-              <Brain className="h-5 w-5 text-[#1d4e4b]" />
-              ElevenLabs Caregiver Assistant
+              {data?.conversation.humanTakeover ? (
+                <Headphones className="h-5 w-5 text-sky-700" />
+              ) : (
+                <Brain className="h-5 w-5 text-[#1d4e4b]" />
+              )}
+              {data?.conversation.humanTakeover ? "Human Support Chat" : "ElevenLabs Caregiver Assistant"}
             </CardTitle>
             <CardDescription>
-              This portal chat now uses the live ElevenLabs agent, while Wibiz remains the backend system of record for caregiver identity, cases, and automation.
+              {data?.conversation.humanTakeover
+                ? "A staff member has taken over this case. New messages go to the human support team instead of the AI assistant."
+                : "This portal chat now uses the live ElevenLabs agent, while Wibiz remains the backend system of record for caregiver identity, cases, and automation."}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <ElevenLabsChatBox
-              initialMessages={
-                data?.messages
-                  .filter((message) => message.role !== "system")
-                  .map((message) => ({
-                    role: message.role as "user" | "assistant",
-                    content: message.content,
-                  })) ?? []
-              }
-              height="70vh"
-              className="rounded-none border-0 bg-transparent shadow-none"
-            />
+            {data?.conversation.humanTakeover ? (
+              <AIChatBox
+                messages={humanSupportMessages}
+                onSendMessage={(content) =>
+                  appendPortalMessage.mutate({
+                    conversationId: data.conversation.id,
+                    role: "user",
+                    content,
+                  })
+                }
+                isLoading={appendPortalMessage.isPending}
+                placeholder="Message the human support team..."
+                height="70vh"
+                className="rounded-none border-0 bg-transparent shadow-none"
+                emptyStateMessage="Your human support thread is ready."
+              />
+            ) : (
+              <ElevenLabsChatBox
+                initialMessages={
+                  data?.messages
+                    .filter((message) => message.role !== "system")
+                    .map((message) => ({
+                      role: message.role as "user" | "assistant" | "staff",
+                      content: message.content,
+                    })) ?? []
+                }
+                height="70vh"
+                className="rounded-none border-0 bg-transparent shadow-none"
+              />
+            )}
           </CardContent>
         </Card>
       </div>

@@ -177,6 +177,8 @@ async function ensureConversationForUser(portalUserId: number) {
     portalUserId,
     title: "Caregiver Support Chat",
     status: "active",
+    caseStatus: "new",
+    casePriority: "normal",
     lastMessageAt: new Date(),
   });
 
@@ -230,6 +232,20 @@ async function refreshConversationTriage(params: {
     resolutionType: triage.resolutionType,
     escalationTriggered: triage.escalationTriggered,
     ghlSyncError: null,
+    caseStatus:
+      triage.safetyResult === "UNSAFE" || triage.escalationTriggered
+        ? "escalated"
+        : triage.callbackRequested
+          ? "pending_callback"
+          : triage.resolutionType && triage.resolutionType !== "self_serve"
+            ? "open"
+            : undefined,
+    casePriority:
+      triage.safetyResult === "UNSAFE"
+        ? "urgent"
+        : triage.safetyResult === "CAUTION" || triage.callbackRequested
+          ? "high"
+          : undefined,
   });
 
   const refreshedConversation = await getAIChatConversationById(conversationId);
@@ -278,8 +294,18 @@ export const aiRouter = router({
     }
 
     const conversation = await ensureConversationForUser(ctx.user.id);
+    if (conversation.humanTakeover) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "A staff member has taken over this chat. Please continue in the portal message thread.",
+      });
+    }
     const identity = await getIdentityByUserId(ctx.user.id);
-    const history = await getAIChatMessagesByConversationId(conversation.id, 50);
+    const history = (await getAIChatMessagesByConversationId(conversation.id, 50)).flatMap((message) =>
+      message.role === "staff"
+        ? []
+        : [{ role: message.role as "system" | "user" | "assistant", content: message.content }]
+    );
     const signedUrl = await getSignedConversationUrl(
       config.elevenLabsApiKey,
       config.elevenLabsAgentId
@@ -406,6 +432,10 @@ export const aiRouter = router({
         content: input.content.trim(),
       });
       await touchAIChatConversation(conversation.id);
+      await updateAIChatConversation(conversation.id, {
+        lastCaregiverResponseAt: input.role === "user" ? new Date() : undefined,
+        caseStatus: input.role === "user" && conversation.humanTakeover ? "in_progress" : undefined,
+      });
       const identity = await getIdentityByUserId(ctx.user.id);
       await refreshConversationTriage({
         conversationId: conversation.id,
@@ -431,15 +461,29 @@ export const aiRouter = router({
       if (!conversation || conversation.portalUserId !== ctx.user.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Conversation not found for current user" });
       }
+      if (conversation.humanTakeover) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "A staff member has taken over this chat. Please wait for their reply in the portal.",
+        });
+      }
 
       const identity = await getIdentityByUserId(ctx.user.id);
       const history = await getAIChatMessagesByConversationId(conversation.id, 50);
+      const llmHistory = history.flatMap((message) =>
+        message.role === "staff"
+          ? []
+          : [{ role: message.role as "system" | "user" | "assistant", content: message.content }]
+      );
 
       await createAIChatMessage({
         conversationId: conversation.id,
         portalUserId: ctx.user.id,
         role: "user",
         content: input.content.trim(),
+      });
+      await updateAIChatConversation(conversation.id, {
+        lastCaregiverResponseAt: new Date(),
       });
 
       const llmMessages: Message[] = [
@@ -455,10 +499,7 @@ export const aiRouter = router({
             identity,
           }),
         },
-        ...history.map<Message>((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
+        ...llmHistory.map<Message>((message) => message),
         {
           role: "user",
           content: input.content.trim(),

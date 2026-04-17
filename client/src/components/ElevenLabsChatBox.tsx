@@ -4,11 +4,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { Bot, Loader2, RotateCcw, Send, User } from "lucide-react";
+import { Bot, Headphones, Loader2, RotateCcw, Send, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type StoredMessage = {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "staff";
   content: string;
 };
 
@@ -234,7 +234,7 @@ export function ElevenLabsChatBox({
             setStreamingReply("");
             appendPortalMessageRef.current?.mutate({
               conversationId: session.conversationId,
-              role: nextMessage.role,
+              role: nextMessage.role === "user" ? "user" : "assistant",
               content: nextMessage.content,
             });
           },
@@ -406,9 +406,15 @@ export function ElevenLabsChatBox({
                   message.role === "user" ? "justify-end" : "justify-start"
                 )}
               >
-                {message.role === "assistant" ? (
-                  <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <Bot className="h-4 w-4 text-primary" />
+                {message.role !== "user" ? (
+                  <div className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                    message.role === "staff" ? "bg-sky-100" : "bg-primary/10"
+                  }`}>
+                    {message.role === "staff" ? (
+                      <Headphones className="h-4 w-4 text-sky-700" />
+                    ) : (
+                      <Bot className="h-4 w-4 text-primary" />
+                    )}
                   </div>
                 ) : null}
 
@@ -417,9 +423,16 @@ export function ElevenLabsChatBox({
                     "max-w-[82%] rounded-[1.2rem] px-4 py-3 text-sm",
                     message.role === "user"
                       ? "bg-[#1d4e4b] text-white"
-                      : "bg-[#ede7dc] text-foreground"
+                      : message.role === "staff"
+                        ? "border border-sky-200 bg-sky-50 text-sky-950"
+                        : "bg-[#ede7dc] text-foreground"
                   )}
                 >
+                  {message.role === "staff" ? (
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">
+                      Human staff
+                    </p>
+                  ) : null}
                   <p className="whitespace-pre-wrap leading-6">{message.content}</p>
                 </div>
 

@@ -175,10 +175,10 @@ export default function StaffPortalPage() {
                         <Button
                           variant="outline"
                           className="rounded-full border-[#ddd3c4] bg-white hover:bg-white"
-                          onClick={() => setLocation("/call")}
+                          onClick={() => setLocation(`/call/${entry.item.call.sessionId}`)}
                         >
                           <PhoneCall className="mr-2 h-4 w-4" />
-                          Staff callback
+                          Callback tools
                         </Button>
                       ) : null}
                     </div>
@@ -220,9 +220,9 @@ export default function StaffPortalPage() {
                       <Button className="rounded-full bg-[#1d4e4b] hover:bg-[#0f2e2c]" onClick={() => setLocation(`/call/${item.call.sessionId}`)}>
                         Open case
                       </Button>
-                      <Button variant="outline" className="rounded-full border-[#ddd3c4] bg-white hover:bg-white" onClick={() => setLocation("/call")}>
+                      <Button variant="outline" className="rounded-full border-[#ddd3c4] bg-white hover:bg-white" onClick={() => setLocation(`/call/${item.call.sessionId}`)}>
                         <PhoneCall className="mr-2 h-4 w-4" />
-                        Start callback
+                        Callback tools
                       </Button>
                     </div>
                   </div>
