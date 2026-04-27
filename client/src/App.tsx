@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { StaffCaseNotifications } from "./components/StaffCaseNotifications";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import AssistantPage from "./pages/AssistantPage";
 import AdminConversationsPage from "./pages/AdminConversationsPage";
@@ -58,6 +59,7 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
+          <StaffCaseNotifications />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

@@ -97,6 +97,8 @@ export default function ChatConversationDetailsPage() {
   const [callbackPhone, setCallbackPhone] = useState("");
   const [callbackStatus, setCallbackStatus] = useState<(typeof CALLBACK_STATUSES)[number]>("attempted");
   const [callbackNotes, setCallbackNotes] = useState("");
+  const [manualCallTranscript, setManualCallTranscript] = useState("");
+  const [manualCallNotes, setManualCallNotes] = useState("");
 
   const conversation = supportCaseQuery.data?.conversation ?? detailsQuery.data?.conversation;
   const messages = supportCaseQuery.data?.messages ?? detailsQuery.data?.messages ?? [];
@@ -155,10 +157,28 @@ export default function ChatConversationDetailsPage() {
     onError: (error) => toast.error("Could not save callback", { description: error.message }),
   });
 
+  const shareManualCallTranscript = trpc.admin.shareManualCallTranscript.useMutation({
+    onSuccess: async () => {
+      setManualCallTranscript("");
+      setManualCallNotes("");
+      toast.success("Manual call transcript shared");
+      await Promise.all([
+        utils.ai.getConversationDetails.invalidate({ conversationId }),
+        utils.admin.staffConversationCase.invalidate({ conversationId }),
+        utils.admin.staffDashboard.invalidate(),
+      ]);
+    },
+    onError: (error) => toast.error("Could not share transcript", { description: error.message }),
+  });
+
   const isLoading = detailsQuery.isLoading || (isStaff && supportCaseQuery.isLoading);
   const error = detailsQuery.error ?? supportCaseQuery.error;
 
   const callbackHistory = useMemo(() => callbacks, [callbacks]);
+  const aiCallbackTemplate = [
+    "I can also point you to our voice AI support agent for a callback-style conversation in the portal.",
+    "Open Start a Call from the portal menu and choose Browser voice call when you are ready. A staff member will continue to monitor this case and follow up on the transcript.",
+  ].join("\n\n");
 
   if (isLoading) {
     return (
@@ -319,12 +339,35 @@ export default function ChatConversationDetailsPage() {
                   />
                   <div className="flex flex-wrap gap-2">
                     <Button
+                      variant="outline"
+                      className="rounded-full"
+                      disabled={updateCase.isPending}
+                      onClick={() =>
+                        updateCase.mutate({
+                          conversationId,
+                          humanTakeover: true,
+                          ownershipAction: "claim",
+                          caseStatus: "in_progress",
+                        })
+                      }
+                    >
+                      Answer & own case
+                    </Button>
+                    <Button
                       className="rounded-full bg-[#1d4e4b] hover:bg-[#0f2e2c]"
                       disabled={!staffReply.trim() || sendStaffReply.isPending}
                       onClick={() => sendStaffReply.mutate({ conversationId, content: staffReply })}
                     >
                       {sendStaffReply.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
                       Send human reply
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-full"
+                      disabled={sendStaffReply.isPending}
+                      onClick={() => setStaffReply(aiCallbackTemplate)}
+                    >
+                      Insert voice AI handoff
                     </Button>
                     <Button
                       variant="outline"
@@ -533,6 +576,55 @@ export default function ChatConversationDetailsPage() {
                       }
                     >
                       Save callback history
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                        Manual call transcript
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        For non-Twilio calls, staff can call externally, paste the call notes or transcript here, and share it back into the caregiver chat thread.
+                      </p>
+                    </div>
+                    <Textarea
+                      value={manualCallTranscript}
+                      onChange={(event) => setManualCallTranscript(event.target.value)}
+                      rows={5}
+                      placeholder="Paste manual call transcript or staff call summary..."
+                    />
+                    <Textarea
+                      value={manualCallNotes}
+                      onChange={(event) => setManualCallNotes(event.target.value)}
+                      rows={2}
+                      placeholder="Internal call disposition notes..."
+                    />
+                    <Button
+                      className="rounded-full bg-[#1d4e4b] hover:bg-[#0f2e2c]"
+                      disabled={
+                        !callbackPhone ||
+                        !manualCallTranscript.trim() ||
+                        shareManualCallTranscript.isPending
+                      }
+                      onClick={() =>
+                        shareManualCallTranscript.mutate({
+                          conversationId,
+                          phoneNumber: callbackPhone,
+                          transcript: manualCallTranscript,
+                          notes: manualCallNotes,
+                          callbackStatus,
+                        })
+                      }
+                    >
+                      {shareManualCallTranscript.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                      )}
+                      Share transcript in chat
                     </Button>
                   </div>
 

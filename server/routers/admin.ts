@@ -206,6 +206,57 @@ export const adminRouter = router({
       return getSupportConversationCase(input.conversationId);
     }),
 
+  shareManualCallTranscript: staffProcedure
+    .input(
+      z.object({
+        conversationId: z.number().int().positive(),
+        phoneNumber: z.string().min(3).max(30),
+        transcript: z.string().min(1).max(12000),
+        notes: z.string().max(4000).optional(),
+        callbackStatus: callbackStatusEnum.default("connected"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await getAIChatConversationById(input.conversationId);
+      if (!conversation) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation case not found" });
+      }
+
+      const now = new Date();
+      const transcriptMessage = [
+        "Manual call transcript shared by staff:",
+        "",
+        input.transcript.trim(),
+      ].join("\n");
+
+      await createAIChatMessage({
+        conversationId: input.conversationId,
+        portalUserId: conversation.portalUserId,
+        role: "staff",
+        content: transcriptMessage,
+      });
+      await createCallbackAttempt({
+        portalUserId: conversation.portalUserId,
+        staffUserId: ctx.user.id,
+        conversationId: input.conversationId,
+        phoneNumber: input.phoneNumber,
+        status: input.callbackStatus,
+        notes: input.notes?.trim() || "Manual call transcript shared in portal chat.",
+        startedAt: now,
+        endedAt: now,
+      });
+      await touchAIChatConversation(input.conversationId);
+      await updateAIChatConversation(input.conversationId, {
+        humanTakeover: true,
+        humanTakeoverAt: conversation.humanTakeover ? conversation.humanTakeoverAt : now,
+        assignedStaffUserId: ctx.user.id,
+        lastStaffResponseAt: now,
+        caseStatus: "pending_caregiver",
+      });
+
+      return getSupportConversationCase(input.conversationId);
+    }),
+
   logCallbackAttempt: staffProcedure
     .input(
       z.object({
