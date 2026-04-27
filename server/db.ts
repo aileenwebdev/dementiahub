@@ -140,6 +140,20 @@ export async function getIdentityByGhlContactId(ghlContactId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getIdentityByPhoneNumber(phoneNumber: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const normalizedDigits = phoneNumber.replace(/\D/g, "");
+  if (!normalizedDigits) return undefined;
+
+  const result = await db
+    .select()
+    .from(userIdentityMap)
+    .where(sql`regexp_replace(${userIdentityMap.phoneNumber}, '[^0-9]', '') = ${normalizedDigits}`)
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
 export async function upsertIdentityMap(data: InsertUserIdentityMap): Promise<void> {
   const db = await getDb();
   if (!db) return;

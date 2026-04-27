@@ -39,7 +39,7 @@ function parseCsvEnv(value: string | undefined): string[] {
 }
 
 export function normalizePhoneForComparison(value: string | undefined): string {
-  return normalizeEnvValue(value).replace(/[^\d+]/g, "");
+  return normalizeEnvValue(value).replace(/^whatsapp:/i, "").replace(/[^\d+]/g, "");
 }
 
 export function isApprovedOutboundQaNumber(
@@ -65,6 +65,13 @@ export const config = {
   // ElevenLabs API
   elevenLabsApiKey: normalizeBearerToken(process.env.ELEVENLABS_API_KEY),
   elevenLabsAgentId: normalizeEnvValue(process.env.ELEVENLABS_AGENT_ID),
+
+  // Twilio / WhatsApp API
+  twilioAccountSid: normalizeEnvValue(process.env.TWILIO_ACCOUNT_SID),
+  twilioAuthToken: normalizeEnvValue(process.env.TWILIO_AUTH_TOKEN),
+  twilioPhoneNumber: normalizeEnvValue(process.env.TWILIO_PHONE_NUMBER),
+  twilioWhatsappNumber: normalizeEnvValue(process.env.TWILIO_WHATSAPP_NUMBER),
+  twilioMessagingServiceSid: normalizeEnvValue(process.env.TWILIO_MESSAGING_SERVICE_SID),
 
   // Webhook secrets (for verifying inbound webhook authenticity)
   elevenLabsPostCallWebhookSecret:
@@ -115,4 +122,12 @@ export function isGHLConfigured(): boolean {
  */
 export function isElevenLabsConfigured(): boolean {
   return Boolean(config.elevenLabsApiKey && config.elevenLabsAgentId);
+}
+
+export function isTwilioConfigured(): boolean {
+  return Boolean(
+    config.twilioAccountSid &&
+      config.twilioAuthToken &&
+      (config.twilioPhoneNumber || config.twilioWhatsappNumber || config.twilioMessagingServiceSid)
+  );
 }

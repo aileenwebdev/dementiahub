@@ -9,8 +9,18 @@
 
 import crypto from "crypto";
 import { Router } from "express";
-import { config, verifyElevenLabsWebhookSecret } from "./config";
-import { queueFailedSync, updateConsentForContact } from "./db";
+import { config, normalizePhoneForComparison, verifyElevenLabsWebhookSecret } from "./config";
+import {
+  createAIChatConversation,
+  createAIChatMessage,
+  getActiveAIChatConversationByUserId,
+  getAIChatConversationById,
+  getIdentityByPhoneNumber,
+  queueFailedSync,
+  touchAIChatConversation,
+  updateAIChatConversation,
+  updateConsentForContact,
+} from "./db";
 import { addTagsToContact, updateContact } from "./services/ghl";
 import { processPostCallWebhook } from "./services/postCallSync";
 
@@ -91,6 +101,132 @@ function unwrapWebhookPayload(payload: any) {
   }
 
   return payload;
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function twimlMessage(message?: string) {
+  const body = message ? `<Message>${escapeXml(message)}</Message>` : "";
+  return `<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`;
+}
+
+function twimlVoice(message: string) {
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say>${escapeXml(message)}</Say></Response>`;
+}
+
+function getRequestUrl(req: any) {
+  const path = req.originalUrl ?? req.url ?? "";
+  return `${config.appUrl.replace(/\/+$/, "")}${path}`;
+}
+
+function getBodyParams(body: any) {
+  if (!body || typeof body !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(body).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? String(value[0] ?? "") : String(value ?? ""),
+    ])
+  );
+}
+
+function verifyTwilioSignature(req: any) {
+  if (!config.twilioAuthToken) {
+    return true;
+  }
+
+  const signature = req.headers["x-twilio-signature"];
+  if (typeof signature !== "string") {
+    return false;
+  }
+
+  const url = getRequestUrl(req);
+  const params = getBodyParams(req.body);
+  const data = Object.keys(params)
+    .sort()
+    .reduce((payload, key) => `${payload}${key}${params[key]}`, url);
+  const expected = crypto.createHmac("sha1", config.twilioAuthToken).update(data).digest("base64");
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  } catch {
+    return false;
+  }
+}
+
+function normalizeTwilioAddress(value?: string) {
+  return normalizePhoneForComparison(value ?? "");
+}
+
+async function ensureConversationForTwilio(portalUserId: number) {
+  const existing = await getActiveAIChatConversationByUserId(portalUserId);
+  if (existing) return existing;
+
+  const conversationId = await createAIChatConversation({
+    portalUserId,
+    title: "WhatsApp Support Chat",
+    status: "active",
+    caseStatus: "open",
+    casePriority: "normal",
+    lastMessageAt: new Date(),
+  });
+
+  if (!conversationId) {
+    throw new Error("Failed to create Twilio support conversation");
+  }
+
+  const created = await getAIChatConversationById(conversationId);
+  if (!created) {
+    throw new Error("Created Twilio support conversation could not be loaded");
+  }
+
+  return created;
+}
+
+async function appendTwilioMessageToPortalCase(params: {
+  from: string;
+  to: string;
+  body: string;
+  messageSid?: string;
+  channel: "whatsapp" | "sms";
+}) {
+  const identity = await getIdentityByPhoneNumber(params.from);
+  if (!identity) {
+    console.warn(`[Twilio] No portal identity matched inbound ${params.channel} from ${params.from}`);
+    return { matched: false as const };
+  }
+
+  const conversation = await ensureConversationForTwilio(identity.portalUserId);
+  const channelLabel = params.channel === "whatsapp" ? "WhatsApp" : "SMS";
+  const content = [
+    `[${channelLabel}] ${params.body.trim()}`,
+    params.messageSid ? `\nTwilio message: ${params.messageSid}` : "",
+  ].join("");
+
+  await createAIChatMessage({
+    conversationId: conversation.id,
+    portalUserId: identity.portalUserId,
+    role: "user",
+    content,
+  });
+  await touchAIChatConversation(conversation.id);
+  await updateAIChatConversation(conversation.id, {
+    lastCaregiverResponseAt: new Date(),
+    caseStatus: conversation.humanTakeover ? "in_progress" : "open",
+    casePriority: conversation.casePriority ?? "normal",
+  });
+
+  console.log(
+    `[Twilio] inbound ${params.channel} routed conversation=${conversation.id} user=${identity.portalUserId}`
+  );
+
+  return { matched: true as const, conversationId: conversation.id, portalUserId: identity.portalUserId };
 }
 
 webhookRouter.post("/elevenlabs/post-call", async (req, res) => {
@@ -191,6 +327,85 @@ webhookRouter.post("/elevenlabs/consent", async (req, res) => {
   }
 });
 
+webhookRouter.post("/twilio/messaging", async (req, res) => {
+  if (!verifyTwilioSignature(req)) {
+    console.error("[Twilio] messaging auth failed - invalid signature");
+    return res.status(401).type("text/xml").send(twimlMessage());
+  }
+
+  const from = normalizeTwilioAddress(req.body?.From);
+  const to = normalizeTwilioAddress(req.body?.To);
+  const body = String(req.body?.Body ?? "").trim();
+  const messageSid = typeof req.body?.MessageSid === "string" ? req.body.MessageSid : undefined;
+  const channel = String(req.body?.From ?? "").toLowerCase().startsWith("whatsapp:")
+    ? "whatsapp"
+    : "sms";
+
+  if (!from || !body) {
+    return res.status(200).type("text/xml").send(twimlMessage());
+  }
+
+  try {
+    const result = await appendTwilioMessageToPortalCase({
+      from,
+      to,
+      body,
+      messageSid,
+      channel,
+    });
+
+    const reply = result.matched
+      ? "Thanks. Your message has reached DementiaHub support. A human staff member can review this case in the portal."
+      : "Thanks for reaching DementiaHub. Please sign in to the caregiver portal so we can link this WhatsApp number to your support record.";
+
+    return res.status(200).type("text/xml").send(twimlMessage(reply));
+  } catch (err: any) {
+    console.error("[Twilio] inbound messaging handler failed:", err?.message ?? err);
+    return res
+      .status(200)
+      .type("text/xml")
+      .send(twimlMessage("Thanks. We received your message, but support routing needs review."));
+  }
+});
+
+webhookRouter.post("/twilio/status", async (req, res) => {
+  if (!verifyTwilioSignature(req)) {
+    console.error("[Twilio] status auth failed - invalid signature");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  console.log("[Twilio] message status", {
+    messageSid: req.body?.MessageSid,
+    status: req.body?.MessageStatus ?? req.body?.SmsStatus,
+    to: req.body?.To,
+    errorCode: req.body?.ErrorCode,
+  });
+
+  return res.status(200).json({ status: "ok" });
+});
+
+webhookRouter.post("/twilio/voice", async (req, res) => {
+  if (!verifyTwilioSignature(req)) {
+    console.error("[Twilio] voice auth failed - invalid signature");
+    return res.status(401).type("text/xml").send(twimlVoice("Unauthorized"));
+  }
+
+  console.log("[Twilio] inbound voice webhook", {
+    callSid: req.body?.CallSid,
+    from: req.body?.From,
+    to: req.body?.To,
+  });
+
+  return res
+    .status(200)
+    .type("text/xml")
+    .send(
+      twimlVoice(
+        "Thank you for calling DementiaHub. Voice AI handoff is being configured. Please use the caregiver portal or WhatsApp support message for now."
+      )
+    );
+});
+
 webhookRouter.get("/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -201,6 +416,7 @@ webhookRouter.get("/health", (_req, res) => {
     },
     ghl: config.ghlApiKey ? "configured" : "missing",
     elevenlabs: config.elevenLabsApiKey ? "configured" : "missing",
+    twilio: config.twilioAuthToken ? "configured" : "missing",
   });
 });
 

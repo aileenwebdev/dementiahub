@@ -8,12 +8,16 @@ import {
   Activity,
   Bot,
   CheckCircle2,
+  Copy,
   ExternalLink,
   Link2,
+  MessageCircle,
+  Phone,
   RefreshCcw,
   ShieldAlert,
   Webhook,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 import DashboardLayout from "../components/DashboardLayout";
 
@@ -27,6 +31,34 @@ function formatDate(value?: string | number | Date | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function copyToClipboard(value?: string | null) {
+  if (!value) return;
+  void navigator.clipboard.writeText(value);
+  toast.success("Copied");
+}
+
+function WebhookUrlRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">{label}</p>
+          <p className="mt-2 break-all text-sm font-medium text-[#0f2e2c]">{value || "Unavailable"}</p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 rounded-full border-[#ddd3c4] bg-white"
+          disabled={!value}
+          onClick={() => copyToClipboard(value)}
+        >
+          <Copy className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function AdminIntegrationPage() {
@@ -145,6 +177,56 @@ export default function AdminIntegrationPage() {
           <Card className="cg-panel rounded-[2rem] border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
+                <MessageCircle className="h-5 w-5 text-[#1d4e4b]" />
+                Twilio and WhatsApp
+              </CardTitle>
+              <CardDescription>
+                Plug-and-play inbound WhatsApp/SMS routing into the staff case queue.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[1.2rem] bg-white/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Account SID</p>
+                  <p className="mt-2 text-lg font-semibold text-[#0f2e2c]">
+                    {integration.data?.twilio.accountSidConfigured ? "Configured" : "Missing"}
+                  </p>
+                </div>
+                <div className="rounded-[1.2rem] bg-white/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Signature Validation</p>
+                  <p className="mt-2 text-lg font-semibold text-[#0f2e2c]">
+                    {integration.data?.twilio.authTokenConfigured ? "Enabled" : "Missing token"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/65 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">WhatsApp Sender</p>
+                  <p className="mt-2 break-all font-medium text-[#0f2e2c]">
+                    {integration.data?.twilio.whatsappNumber || "Set TWILIO_WHATSAPP_NUMBER"}
+                  </p>
+                </div>
+                <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/65 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Messaging Service</p>
+                  <p className="mt-2 break-all font-medium text-[#0f2e2c]">
+                    {integration.data?.twilio.messagingServiceSid || "Optional"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/65 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Current behavior</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Incoming WhatsApp/SMS messages are matched by caregiver phone number, appended to the caregiver's portal chat, and surfaced in the staff/admin support queue. If no portal identity matches, Twilio receives a safe acknowledgement asking the caregiver to sign in and link their number.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="cg-panel rounded-[2rem] border-0">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
                 <Bot className="h-5 w-5 text-[#1d4e4b]" />
                 ElevenLabs
               </CardTitle>
@@ -199,27 +281,34 @@ export default function AdminIntegrationPage() {
               <CardDescription>Endpoints that should be configured in ElevenLabs to push post-call and consent events back into the portal.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { label: "Post-call webhook", value: integration.data?.webhooks.postCall },
-                { label: "Consent webhook", value: integration.data?.webhooks.consent },
-                { label: "Health endpoint", value: integration.data?.webhooks.health },
-              ].map((item) => (
-                <div key={item.label} className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">{item.label}</p>
-                  <p className="mt-2 break-all text-sm font-medium text-[#0f2e2c]">{item.value || "Unavailable"}</p>
-                </div>
-              ))}
+              <WebhookUrlRow label="ElevenLabs post-call webhook" value={integration.data?.webhooks.postCall} />
+              <WebhookUrlRow label="ElevenLabs consent webhook" value={integration.data?.webhooks.consent} />
+              <WebhookUrlRow label="Twilio WhatsApp/SMS incoming message webhook" value={integration.data?.webhooks.twilioMessaging} />
+              <WebhookUrlRow label="Twilio message status callback" value={integration.data?.webhooks.twilioStatus} />
+              <WebhookUrlRow label="Twilio voice webhook" value={integration.data?.webhooks.twilioVoice} />
+              <WebhookUrlRow label="Health endpoint" value={integration.data?.webhooks.health} />
 
               <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/70 p-4">
                 <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Shared Secret</p>
                 <div className="mt-2 flex items-center gap-2">
-                  {integration.data?.webhooks.secretConfigured ? (
+                  {integration.data?.webhooks.secretConfigured.postCall &&
+                  integration.data?.webhooks.secretConfigured.consent ? (
                     <>
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      <span className="text-sm font-medium text-[#0f2e2c]">Configured on the server</span>
+                      <span className="text-sm font-medium text-[#0f2e2c]">ElevenLabs secrets configured</span>
                     </>
                   ) : (
-                    <span className="text-sm text-muted-foreground">Missing</span>
+                    <span className="text-sm text-muted-foreground">ElevenLabs secret missing</span>
+                  )}
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  {integration.data?.webhooks.secretConfigured.twilioSignature ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <span className="text-sm font-medium text-[#0f2e2c]">Twilio signature validation enabled</span>
+                    </>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Twilio auth token missing</span>
                   )}
                 </div>
               </div>
@@ -271,6 +360,39 @@ export default function AdminIntegrationPage() {
             </CardContent>
           </Card>
         </section>
+
+        <Card className="cg-panel rounded-[2rem] border-0">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
+              <Phone className="h-5 w-5 text-[#1d4e4b]" />
+              Setup Checklist
+            </CardTitle>
+            <CardDescription>
+              Admin handoff steps for Twilio, WhatsApp, and ElevenLabs routing.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-3">
+            {[
+              {
+                title: "Twilio WhatsApp",
+                body: "In Twilio Console, set the inbound message webhook for your WhatsApp sender or Messaging Service to the Twilio WhatsApp/SMS URL above. Use HTTP POST.",
+              },
+              {
+                title: "Twilio Status",
+                body: "Set the message status callback to the status URL above so delivery failures can be logged and surfaced later.",
+              },
+              {
+                title: "ElevenLabs",
+                body: "Keep ElevenLabs post-call and consent webhooks pointed to the portal URLs above. The next phase can send approved WhatsApp replies through Twilio after staff/AI policy is confirmed.",
+              },
+            ].map((item) => (
+              <div key={item.title} className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/65 p-4">
+                <p className="font-semibold text-[#0f2e2c]">{item.title}</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.body}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         <div className="flex justify-end">
           <Button
