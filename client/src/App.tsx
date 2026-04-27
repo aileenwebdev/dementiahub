@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
+import { CaregiverStaffReplyNotifications } from "./components/CaregiverStaffReplyNotifications";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { StaffCaseNotifications } from "./components/StaffCaseNotifications";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -60,6 +61,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <StaffCaseNotifications />
+          <CaregiverStaffReplyNotifications />
           <Router />
         </TooltipProvider>
       </ThemeProvider>
