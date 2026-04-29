@@ -29,6 +29,7 @@ const CAUTION_PATTERNS: Array<{ pattern: RegExp; flag: string }> = [
   { pattern: /\b(choking|not breathing|chest pain|stroke|seizure|bleeding)\b/i, flag: "medical_risk" },
   { pattern: /\b(aggressive|agitated|confused and lost|unsafe at home)\b/i, flag: "behavioral_risk" },
   { pattern: /\b(hopeless|desperate|breakdown|breaking down|overwhelmed|cannot cope|can't cope|cant cope|no purpose|feel lost)\b/i, flag: "emotional_distress" },
+  { pattern: /\b(after hours|after-hours|off hours|off-hours|late at night|tonight|outside operating hours|outside office hours|tomorrow morning|next business day)\b/i, flag: "off_hours_request" },
 ];
 
 const TOPIC_RULES: Array<{ topic: string; pattern: RegExp }> = [
@@ -40,8 +41,31 @@ const TOPIC_RULES: Array<{ topic: string; pattern: RegExp }> = [
 ];
 
 const CALLBACK_PATTERN =
-  /\b(call me|call back|callback|please contact|have someone contact|speak to someone|human support|staff follow up)\b/i;
+  /\b(call me|call back|callback|please contact|contact me|have someone contact|speak to someone|human support|staff follow up|staff follow-up)\b/i;
 const CONSENT_PATTERN = /\b(i consent|yes i agree|yes,? you can|consent given)\b/i;
+
+const LETTER_PATTERN = /[a-z]/i;
+const CJK_PATTERN = /[\u3400-\u9fff]/;
+const MALAY_SINGLISH_PATTERN = /\b(lah|leh|lor|alamak|tak|boleh|tolong)\b/i;
+
+function isLikelyUnrecognizedInput(value: string) {
+  const compacted = compactWhitespace(value);
+  if (!compacted) return false;
+
+  const normalized = normalizeForMatching(compacted);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const hasKnownCareContext = TOPIC_RULES.some(({ pattern }) => pattern.test(normalized)) ||
+    CALLBACK_PATTERN.test(normalized) ||
+    CONSENT_PATTERN.test(normalized);
+  const hasMixedLanguageSignal = CJK_PATTERN.test(compacted) || MALAY_SINGLISH_PATTERN.test(compacted);
+  const hasVeryLowSignal =
+    words.length <= 6 &&
+    !hasKnownCareContext &&
+    words.filter((word) => LETTER_PATTERN.test(word)).length <= 3;
+  const hasRepeatedNoise = /\b([a-z]{2,})\b(?:\s+\1\b){1,}/i.test(normalized) || /[?!.]{3,}/.test(compacted);
+
+  return hasVeryLowSignal || (hasMixedLanguageSignal && !hasKnownCareContext) || hasRepeatedNoise;
+}
 
 function compactWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -83,7 +107,12 @@ export function triageConversation(messages: ConversationLine[]): ConversationTr
   const classifierText = normalizedUserText || normalizedCombinedText;
 
   const unsafeMatch = UNSAFE_PATTERNS.find(({ pattern }) => pattern.test(classifierText));
-  const cautionMatch = unsafeMatch ? null : CAUTION_PATTERNS.find(({ pattern }) => pattern.test(classifierText));
+  const unclearInput = !unsafeMatch && isLikelyUnrecognizedInput(userText);
+  const cautionMatch = unsafeMatch
+    ? null
+    : unclearInput
+      ? { pattern: /\bunclear_input\b/i, flag: "unclear_input" }
+      : CAUTION_PATTERNS.find(({ pattern }) => pattern.test(classifierText));
   const topicMatch = unsafeMatch?.flag === "self_harm_risk"
     ? { topic: "safety", pattern: /\bsafety\b/i }
     : TOPIC_RULES.find(({ pattern }) => pattern.test(classifierText));

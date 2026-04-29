@@ -169,6 +169,44 @@ function toElevenLabsContextualUpdate(params: {
   ].join("\n");
 }
 
+function buildTriageGateReply(triage: ReturnType<typeof triageConversation>) {
+  if (triage.safetyResult === "UNSAFE") {
+    return [
+      "I'm really sorry this is happening. This sounds urgent, so I'm handing this to the DementiaHub team for immediate review.",
+      "",
+      "If anyone is in immediate danger, missing, injured, or at risk of harm right now, please call Singapore emergency services at 995 or the police at 999 now.",
+      "",
+      "A staff member should review this case next, so I won't continue with automated advice here.",
+    ].join("\n");
+  }
+
+  if (triage.safetyFlagType === "off_hours_request") {
+    return [
+      "Thanks for reaching DementiaHub. This looks like an after-hours support request, so I've routed it for staff follow-up rather than leaving you waiting in silence.",
+      "",
+      "If this becomes urgent or someone may be unsafe, please contact emergency services immediately. Otherwise, a human team member should follow up during the next operating window.",
+    ].join("\n");
+  }
+
+  if (triage.safetyFlagType === "unclear_input") {
+    return [
+      "I'm sorry, I couldn't understand that clearly enough to give safe guidance.",
+      "",
+      "I've routed this for human review. If you can, please send one short sentence about what is happening, for example: who needs help, what changed, and whether anyone is unsafe right now.",
+    ].join("\n");
+  }
+
+  if (triage.callbackRequested || triage.safetyResult === "CAUTION") {
+    return [
+      "Thanks for telling me. This should be reviewed by a human support team member, so I've routed this case for staff follow-up.",
+      "",
+      "If anyone is in immediate danger, please contact emergency services now. Otherwise, staff can continue from this message thread.",
+    ].join("\n");
+  }
+
+  return null;
+}
+
 async function ensureConversationForUser(portalUserId: number) {
   const existing = await getActiveAIChatConversationByUserId(portalUserId);
   if (existing) return existing;
@@ -485,6 +523,43 @@ export const aiRouter = router({
       await updateAIChatConversation(conversation.id, {
         lastCaregiverResponseAt: new Date(),
       });
+
+      const immediateTriage = triageConversation([
+        ...llmHistory
+          .filter((message) => message.role === "user" || message.role === "assistant")
+          .map((message) => ({
+            role: message.role as "user" | "assistant",
+            content: message.content,
+          })),
+        { role: "user", content: input.content.trim() },
+      ]);
+      const triageGateReply = buildTriageGateReply(immediateTriage);
+
+      if (triageGateReply) {
+        await createAIChatMessage({
+          conversationId: conversation.id,
+          portalUserId: ctx.user.id,
+          role: "assistant",
+          content: triageGateReply,
+        });
+        await touchAIChatConversation(conversation.id);
+        await updateAIChatConversation(conversation.id, {
+          humanTakeover: true,
+          humanTakeoverAt: new Date(),
+        });
+        const refreshed = await refreshConversationTriage({
+          conversationId: conversation.id,
+          portalUserId: ctx.user.id,
+          identity,
+        });
+        const messages = refreshed?.messages ?? (await getAIChatMessagesByConversationId(conversation.id));
+
+        return {
+          conversationId: conversation.id,
+          reply: triageGateReply,
+          messages,
+        };
+      }
 
       const llmMessages: Message[] = [
         {

@@ -46,4 +46,32 @@ describe("triageConversation", () => {
     expect(triage.safetyResult).toBe("UNSAFE");
     expect(triage.safetyFlagType).toBe("self_harm_risk");
   });
+
+  it("routes off-hours requests to staff follow-up", () => {
+    const triage = triageConversation([
+      {
+        role: "user",
+        content: "It is late at night and I need help arranging care tomorrow. Can someone contact me?",
+      },
+    ]);
+
+    expect(triage.safetyResult).toBe("CAUTION");
+    expect(triage.safetyFlagType).toBe("off_hours_request");
+    expect(triage.callbackRequested).toBe(true);
+    expect(triage.escalationTriggered).toBe(true);
+    expect(triage.resolutionType).toBe("needs_staff");
+  });
+
+  it("routes unclear or mixed low-signal input to staff review", () => {
+    const triage = triageConversation([
+      {
+        role: "user",
+        content: "asdf qwer lah 我不知道 what thing ???",
+      },
+    ]);
+
+    expect(triage.safetyResult).toBe("CAUTION");
+    expect(triage.safetyFlagType).toBe("unclear_input");
+    expect(triage.resolutionType).toBe("needs_staff");
+  });
 });

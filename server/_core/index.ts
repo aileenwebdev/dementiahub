@@ -54,11 +54,11 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
-  } else {
+  // production mode uses static files; every other local mode uses Vite
+  if (process.env.NODE_ENV === "production") {
     serveStatic(app);
+  } else {
+    await setupVite(app, server);
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
