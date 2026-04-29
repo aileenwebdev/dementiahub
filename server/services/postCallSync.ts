@@ -488,7 +488,7 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
   );
 
   if (!normalizedPayload.ghlContactId) {
-    const message = `Cannot resolve GHL contact for conversation ${conversationId}`;
+    const message = `Cannot resolve Wibiz contact for conversation ${conversationId}`;
     await persistCallCompletion(
       conversationId,
       {
@@ -528,7 +528,7 @@ export async function processPostCallWebhook(rawPayload: PostCallPayload): Promi
         ghlContactId,
         ghlLocationId: normalizedPayload.ghlLocationId,
         ghlSynced: false,
-        ghlSyncError: error?.message ?? "Unknown GHL sync error",
+        ghlSyncError: error?.message ?? "Unknown Wibiz sync error",
       },
       linkedSession?.sessionId
     );
@@ -561,7 +561,7 @@ interface NormalizedCallPayload {
 
 async function syncToGHL(payload: NormalizedCallPayload): Promise<{ opportunityId?: string }> {
   if (!config.ghlApiKey) {
-    throw new Error("GHL not configured");
+    throw new Error("Wibiz integration not configured");
   }
 
   const {
@@ -586,9 +586,16 @@ async function syncToGHL(payload: NormalizedCallPayload): Promise<{ opportunityI
   let resolvedOpportunityId: string | undefined;
 
   try {
-    const tags: string[] = ["Voice Case - " + safetyResult];
-    if (consentVerballyConfirmed) tags.push("Consent Verified");
-    if (callbackRequested) tags.push("Callback Requested");
+    const tags: string[] = [
+      "Voice Case - " + safetyResult,
+      "Wibiz Trigger - Voice Case",
+      resolutionType === "self_serve"
+        ? "Wibiz Trigger - Self Serve"
+        : "Wibiz Trigger - Needs Staff",
+    ];
+    if (consentVerballyConfirmed) tags.push("Consent Verified", "Wibiz Trigger - Consent Verified");
+    if (callbackRequested) tags.push("Callback Requested", "Wibiz Trigger - Callback Requested");
+    if (escalationTriggered) tags.push("Wibiz Trigger - Escalation");
 
     await updateContact(config.ghlApiKey, ghlContactId, {
       tags,
@@ -686,7 +693,7 @@ async function syncToGHL(payload: NormalizedCallPayload): Promise<{ opportunityI
   try {
     const noteBody = `VOICE CALL SUMMARY - ${callEndTime.toISOString()}
 
-ElevenLabs Conversation ID: ${conversationId}
+Wibiz Voice ID: ${conversationId}
 Duration: ${callDurationSeconds}s
 Safety: ${safetyResult}
 Topic: ${topicClassified}

@@ -654,7 +654,7 @@ export async function getAdminUserDetail(userId: number) {
     user: userRow[0].user,
     identity: userRow[0].identity,
     calls,
-    conversations: conversationsWithMessages,
+    conversations: conversationsWithMessages.filter((item) => item.messages.length > 0),
   };
 }
 
@@ -686,12 +686,14 @@ export async function getAdminRecentAIConversations(limit = 20) {
     .orderBy(desc(aiChatConversations.updatedAt))
     .limit(limit);
 
-  return Promise.all(
+  const hydrated = await Promise.all(
     rows.map(async (row) => ({
       ...row,
       messages: await getAIChatMessagesByConversationId(row.conversation.id, 1),
     }))
   );
+
+  return hydrated.filter((row) => row.messages.length > 0);
 }
 
 export async function getAdminStaffDashboard(limit = 50) {

@@ -83,7 +83,7 @@ export default function AdminIntegrationPage() {
           <ShieldAlert className="mx-auto h-12 w-12 text-[#b77642]" />
           <h1 className="cg-display mt-4 text-3xl font-bold text-[#0f2e2c]">Admin access required</h1>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            Only admin accounts can inspect the Wibiz and ElevenLabs integration wiring.
+            Only admin accounts can inspect the Wibiz integration wiring.
           </p>
           <Button onClick={() => setLocation("/")} className="mt-6 rounded-full bg-[#1d4e4b] hover:bg-[#0f2e2c]">
             Return to dashboard
@@ -101,10 +101,10 @@ export default function AdminIntegrationPage() {
             <div className="max-w-2xl">
               <p className="cg-label">Integration Diagnostics</p>
               <h1 className="cg-display mt-2 text-4xl font-bold text-[#0f2e2c] sm:text-5xl">
-                Wibiz and ElevenLabs wiring
+                Wibiz support wiring
               </h1>
               <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">
-                Review the location-level CRM configuration, ElevenLabs call wiring, webhook endpoints, and queued sync failures before we switch to your final production keys.
+                Review Wibiz configuration, assistant routing, webhook endpoints, and queued sync failures before we switch to your final production keys.
               </p>
             </div>
 
@@ -135,7 +135,7 @@ export default function AdminIntegrationPage() {
                 <Link2 className="h-5 w-5 text-[#1d4e4b]" />
                 Wibiz
               </CardTitle>
-              <CardDescription>Portal-to-CRM caregiver identity bridge and case pipeline visibility.</CardDescription>
+              <CardDescription>Caregiver identity bridge and case pipeline visibility.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -178,7 +178,7 @@ export default function AdminIntegrationPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
                 <MessageCircle className="h-5 w-5 text-[#1d4e4b]" />
-                Twilio and WhatsApp
+                WhatsApp Messaging
               </CardTitle>
               <CardDescription>
                 Plug-and-play inbound WhatsApp/SMS routing into the staff case queue.
@@ -187,7 +187,7 @@ export default function AdminIntegrationPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[1.2rem] bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Account SID</p>
+                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Messaging Account</p>
                   <p className="mt-2 text-lg font-semibold text-[#0f2e2c]">
                     {integration.data?.twilio.accountSidConfigured ? "Configured" : "Missing"}
                   </p>
@@ -218,7 +218,7 @@ export default function AdminIntegrationPage() {
               <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/65 p-4">
                 <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Current behavior</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Incoming WhatsApp/SMS messages are matched by caregiver phone number, appended to the caregiver's portal chat, and surfaced in the staff/admin support queue. If no portal identity matches, Twilio receives a safe acknowledgement asking the caregiver to sign in and link their number.
+                  Incoming WhatsApp/SMS messages are matched by caregiver phone number, appended to the caregiver's portal chat, and surfaced in the staff/admin support queue. If no portal identity matches, Wibiz sends a safe acknowledgement asking the caregiver to sign in and link their number.
                 </p>
               </div>
             </CardContent>
@@ -228,9 +228,9 @@ export default function AdminIntegrationPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-2xl text-[#0f2e2c]">
                 <Bot className="h-5 w-5 text-[#1d4e4b]" />
-                ElevenLabs
+                Wibiz AI Voice
               </CardTitle>
-              <CardDescription>Outbound voice agent setup, recent conversations, and call ingestion status.</CardDescription>
+              <CardDescription>Outbound voice assistant setup, recent conversations, and call ingestion status.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -241,7 +241,7 @@ export default function AdminIntegrationPage() {
                   </p>
                 </div>
                 <div className="rounded-[1.2rem] bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Agent ID</p>
+                  <p className="text-xs uppercase tracking-[0.14em] text-[#527a68]">Assistant ID</p>
                   <p className="mt-2 break-all text-sm font-semibold text-[#0f2e2c]">
                     {integration.data?.elevenlabs.agentId || "Waiting for production agent"}
                   </p>
@@ -263,7 +263,7 @@ export default function AdminIntegrationPage() {
                     </div>
                   ))}
                   {!integration.data?.elevenlabs.recentConversations.length ? (
-                    <p className="text-sm text-muted-foreground">No recent ElevenLabs conversations were returned.</p>
+                    <p className="text-sm text-muted-foreground">No recent Wibiz AI conversations were returned.</p>
                   ) : null}
                 </div>
               </div>
@@ -278,14 +278,14 @@ export default function AdminIntegrationPage() {
                 <Webhook className="h-5 w-5 text-[#1d4e4b]" />
                 Webhooks
               </CardTitle>
-              <CardDescription>Endpoints that should be configured in ElevenLabs to push post-call and consent events back into the portal.</CardDescription>
+              <CardDescription>Endpoints that should be configured to push post-call, consent, and messaging events back into the portal.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <WebhookUrlRow label="ElevenLabs post-call webhook" value={integration.data?.webhooks.postCall} />
-              <WebhookUrlRow label="ElevenLabs consent webhook" value={integration.data?.webhooks.consent} />
-              <WebhookUrlRow label="Twilio WhatsApp/SMS incoming message webhook" value={integration.data?.webhooks.twilioMessaging} />
-              <WebhookUrlRow label="Twilio message status callback" value={integration.data?.webhooks.twilioStatus} />
-              <WebhookUrlRow label="Twilio voice webhook" value={integration.data?.webhooks.twilioVoice} />
+              <WebhookUrlRow label="Wibiz AI post-call webhook" value={integration.data?.webhooks.postCall} />
+              <WebhookUrlRow label="Wibiz AI consent webhook" value={integration.data?.webhooks.consent} />
+              <WebhookUrlRow label="WhatsApp/SMS incoming message webhook" value={integration.data?.webhooks.twilioMessaging} />
+              <WebhookUrlRow label="Message status callback" value={integration.data?.webhooks.twilioStatus} />
+              <WebhookUrlRow label="Voice webhook" value={integration.data?.webhooks.twilioVoice} />
               <WebhookUrlRow label="Health endpoint" value={integration.data?.webhooks.health} />
 
               <div className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/70 p-4">
@@ -295,20 +295,20 @@ export default function AdminIntegrationPage() {
                   integration.data?.webhooks.secretConfigured.consent ? (
                     <>
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      <span className="text-sm font-medium text-[#0f2e2c]">ElevenLabs secrets configured</span>
+                      <span className="text-sm font-medium text-[#0f2e2c]">Wibiz AI secrets configured</span>
                     </>
                   ) : (
-                    <span className="text-sm text-muted-foreground">ElevenLabs secret missing</span>
+                    <span className="text-sm text-muted-foreground">Wibiz AI secret missing</span>
                   )}
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   {integration.data?.webhooks.secretConfigured.twilioSignature ? (
                     <>
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      <span className="text-sm font-medium text-[#0f2e2c]">Twilio signature validation enabled</span>
+                      <span className="text-sm font-medium text-[#0f2e2c]">Messaging signature validation enabled</span>
                     </>
                   ) : (
-                    <span className="text-sm text-muted-foreground">Twilio auth token missing</span>
+                    <span className="text-sm text-muted-foreground">Messaging auth token missing</span>
                   )}
                 </div>
               </div>
@@ -368,22 +368,22 @@ export default function AdminIntegrationPage() {
               Setup Checklist
             </CardTitle>
             <CardDescription>
-              Admin handoff steps for Twilio, WhatsApp, and ElevenLabs routing.
+              Admin handoff steps for WhatsApp and Wibiz AI routing.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 lg:grid-cols-3">
             {[
               {
-                title: "Twilio WhatsApp",
-                body: "In Twilio Console, set the inbound message webhook for your WhatsApp sender or Messaging Service to the Twilio WhatsApp/SMS URL above. Use HTTP POST.",
+                title: "WhatsApp",
+                body: "Set the inbound message webhook for your WhatsApp sender or Messaging Service to the WhatsApp/SMS URL above. Use HTTP POST.",
               },
               {
-                title: "Twilio Status",
+                title: "Message Status",
                 body: "Set the message status callback to the status URL above so delivery failures can be logged and surfaced later.",
               },
               {
-                title: "ElevenLabs",
-                body: "Keep ElevenLabs post-call and consent webhooks pointed to the portal URLs above. The next phase can send approved WhatsApp replies through Twilio after staff/AI policy is confirmed.",
+                title: "Wibiz AI",
+                body: "Keep Wibiz AI post-call and consent webhooks pointed to the portal URLs above. The next phase can send approved WhatsApp replies after staff and assistant policy is confirmed.",
               },
             ].map((item) => (
               <div key={item.title} className="rounded-[1.2rem] border border-[#ddd3c4] bg-white/65 p-4">

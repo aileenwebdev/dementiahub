@@ -411,16 +411,21 @@ export const aiRouter = router({
     .query(async ({ ctx, input }) => {
       const conversations = await getAIChatConversationsByUserId(ctx.user.id, input?.limit ?? 50);
 
-      return Promise.all(
+      const hydrated = await Promise.all(
         conversations.map(async (conversation) => {
-          const messages = await getAIChatMessagesByConversationId(conversation.id, 1);
+          const [messages, allMessages] = await Promise.all([
+            getAIChatMessagesByConversationId(conversation.id, 1),
+            getAIChatMessagesByConversationId(conversation.id, 500),
+          ]);
           return {
             ...conversation,
             lastMessagePreview: messages.at(-1)?.content ?? null,
-            messageCount: (await getAIChatMessagesByConversationId(conversation.id, 500)).length,
+            messageCount: allMessages.length,
           };
         })
       );
+
+      return hydrated.filter((conversation) => conversation.messageCount > 0);
     }),
 
   getConversationDetails: protectedProcedure

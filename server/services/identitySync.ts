@@ -47,7 +47,11 @@ export async function recordPortalSignupConsent(
   }
 
   try {
-    await addTagsToContact(config.ghlApiKey, options.ghlContactId, ["Consent Verified", "Portal Consent"]);
+    await addTagsToContact(config.ghlApiKey, options.ghlContactId, [
+      "Consent Verified",
+      "Portal Consent",
+      "Wibiz Trigger - Consent Verified",
+    ]);
     await updateContact(config.ghlApiKey, options.ghlContactId, {
       customFields: [
         { key: "consent_given", value: "true" },
@@ -125,7 +129,7 @@ export async function ensureGHLIdentity(
         lastName,
         email: user.email ?? undefined,
         phone: phoneNumber,
-        tags: ["Portal User", "DementiaHub"],
+        tags: ["Portal User", "DementiaHub", "Wibiz Portal User", "Wibiz Trigger - Portal Signup"],
         customFields: [
           { key: "portal_user_id", value: String(user.id) },
           { key: "source", value: "DementiaHub Portal" },

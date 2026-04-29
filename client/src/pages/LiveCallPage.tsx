@@ -42,7 +42,7 @@ export default function LiveCallPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="gap-1.5 bg-[#1d4e4b]/10 text-[#1d4e4b] hover:bg-[#1d4e4b]/10">
                 <Mic className="h-3 w-3" />
-                ElevenLabs widget
+                Wibiz voice
               </Badge>
               <Badge variant="outline" className="gap-1.5">
                 <Shield className="h-3 w-3" />
@@ -55,9 +55,9 @@ export default function LiveCallPage() {
         <Card className="border-[#ddd3c4] bg-[#ede7dc]/60">
           <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-[#0f2e2c]">Official ElevenLabs browser voice experience</p>
+              <p className="text-sm font-semibold text-[#0f2e2c]">Wibiz browser voice experience</p>
               <p className="text-xs leading-6 text-muted-foreground">
-                This page now uses the hosted ElevenLabs widget for faster microphone setup. The portal session ID and caregiver profile are still attached so the completed conversation saves back to this logged-in user.
+                This page uses the Wibiz voice experience for faster microphone setup. The portal session ID and caregiver profile are still attached so the completed conversation saves back to this logged-in user.
               </p>
             </div>
             <Button
@@ -103,7 +103,7 @@ export default function LiveCallPage() {
             <div>
               <p className="text-sm font-medium text-emerald-900">The finished call will still save into the portal</p>
               <p className="text-xs text-emerald-700">
-                Once ElevenLabs ends the session and sends the post-call webhook, we match it back to this portal session using the logged-in user and session ID.
+                Once the call ends, Wibiz matches it back to this portal session using the logged-in user and session ID.
               </p>
             </div>
           </CardContent>

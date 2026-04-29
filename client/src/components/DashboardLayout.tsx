@@ -10,7 +10,7 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
 const caregiverMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: MessageSquare, label: "AI Assistant", path: "/assistant" },
+  { icon: MessageSquare, label: "Support Assistant", path: "/assistant" },
   { icon: Phone, label: "Start a Call", path: "/call" },
   { icon: History, label: "Conversation History", path: "/history" },
   { icon: User, label: "My Profile", path: "/profile" },
@@ -18,7 +18,7 @@ const caregiverMenuItems = [
 
 const adminMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: MessageSquare, label: "AI Assistant", path: "/assistant" },
+  { icon: MessageSquare, label: "Support Assistant", path: "/assistant" },
   { icon: Phone, label: "Start a Call", path: "/call" },
   { icon: Activity, label: "All Conversations", path: "/admin/conversations" },
   { icon: History, label: "Conversation History", path: "/history" },
@@ -87,7 +87,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-3">
             {!isMobile && (
               <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-white/70">
-                AI assistant online
+                Support assistant online
               </div>
             )}
             <div className="flex items-center gap-3 rounded-full bg-white/6 px-2 py-2">

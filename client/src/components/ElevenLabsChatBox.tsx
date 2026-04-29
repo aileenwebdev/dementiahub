@@ -150,7 +150,7 @@ export function ElevenLabsChatBox({
           if (!cancelled && !conversationRef.current) {
             setIsBooting(false);
             setStatus("disconnected");
-            setError("ElevenLabs session timed out before connecting. Please try reconnecting.");
+            setError("Wibiz support session timed out before connecting. Please try reconnecting.");
           }
         }, 15000);
 
@@ -268,7 +268,7 @@ export function ElevenLabsChatBox({
         }
         if (!cancelled) {
           setStatus("disconnected");
-          setError(err instanceof Error ? err.message : "Failed to start ElevenLabs chat");
+          setError(err instanceof Error ? err.message : "Failed to start Wibiz support chat");
           startedSessionKeyRef.current = null;
         }
       } finally {
@@ -345,12 +345,12 @@ export function ElevenLabsChatBox({
     >
       <div className="flex items-center justify-between border-b border-[#ddd3c4] bg-[#f7f2ea] px-4 py-3">
         <div>
-          <p className="text-sm font-semibold text-[#0f2e2c]">ElevenLabs Chat Assistant</p>
+          <p className="text-sm font-semibold text-[#0f2e2c]">Wibiz Support Assistant</p>
           <p className="text-xs text-muted-foreground">
             {status === "connected"
-              ? "Connected to the live ElevenLabs caregiver agent"
+              ? "Connected to the live Wibiz support assistant"
               : isBooting
-                ? "Connecting to ElevenLabs..."
+                ? "Connecting to Wibiz..."
                 : "Session offline"}
           </p>
         </div>
@@ -391,7 +391,7 @@ export function ElevenLabsChatBox({
             {messages.length === 0 && !streamingReply ? (
               <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-muted-foreground">
                 <Bot className="mb-4 h-10 w-10 opacity-20" />
-                <p className="text-sm">The live ElevenLabs caregiver agent is ready.</p>
+                <p className="text-sm">The live Wibiz support assistant is ready.</p>
                 <p className="mt-2 max-w-md text-xs leading-6">
                   Start typing to talk to the same assistant voice and language model you plan to use for live caregiver support.
                 </p>
@@ -491,7 +491,7 @@ export function ElevenLabsChatBox({
               handleSend();
             }
           }}
-          placeholder="Message the ElevenLabs caregiver assistant..."
+          placeholder="Message the Wibiz support assistant..."
           className="min-h-9 max-h-32 flex-1 resize-none"
           rows={1}
           disabled={status !== "connected"}

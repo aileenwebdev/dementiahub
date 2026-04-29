@@ -73,7 +73,7 @@ export default function AdminConversationsPage() {
           <ShieldAlert className="mx-auto h-12 w-12 text-[#b77642]" />
           <h1 className="cg-display mt-4 text-3xl font-bold text-[#0f2e2c]">Admin access required</h1>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            This panel is only available to DementiaHub administrators. We can promote an account to admin and wire the final Wibiz and ElevenLabs credentials when you share them.
+            This panel is only available to DementiaHub administrators. We can promote an account to admin and wire the final Wibiz credentials when you share them.
           </p>
           <Button onClick={() => setLocation("/")} className="mt-6 rounded-full bg-[#1d4e4b] hover:bg-[#0f2e2c]">
             Return to dashboard
@@ -126,7 +126,7 @@ export default function AdminConversationsPage() {
               { label: "Linked to Wibiz", value: stats.linkedUsers, icon: Link2, tone: "bg-[#7a9e8a]/14 text-[#527a68]" },
               { label: "Consent Verified", value: stats.consentedUsers, icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-700" },
               { label: "Voice Calls", value: stats.totalCalls, icon: Clock3, tone: "bg-[#d4935a]/14 text-[#b77642]" },
-              { label: "AI Threads", value: stats.aiConversations, icon: Bot, tone: "bg-[#ede7dc] text-[#0f2e2c]" },
+              { label: "Support Threads", value: stats.aiConversations, icon: Bot, tone: "bg-[#ede7dc] text-[#0f2e2c]" },
             ].map((stat) => (
               <div key={stat.label} className="cg-stat rounded-[1.5rem] p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -232,7 +232,7 @@ export default function AdminConversationsPage() {
           <Card className="cg-panel rounded-[2rem] border-0">
             <CardHeader className="pb-4">
               <CardTitle className="text-2xl text-[#0f2e2c]">Selected Caregiver</CardTitle>
-              <CardDescription>Portal identity, saved AI threads, and recent call records for the currently selected user.</CardDescription>
+              <CardDescription>Portal identity, saved support threads, and recent call records for the currently selected user.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               {selectedDetail ? (
@@ -297,10 +297,10 @@ export default function AdminConversationsPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#527a68]">Saved AI Threads</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#527a68]">Saved Support Threads</h3>
                     {selectedDetail.conversations.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-[#ddd3c4] bg-white/55 px-4 py-6 text-sm text-muted-foreground">
-                        No AI chat history saved for this caregiver yet.
+                        No support chat history saved for this caregiver yet.
                       </div>
                     ) : (
                       selectedDetail.conversations.slice(0, 3).map(({ conversation, messages }) => (
@@ -334,7 +334,7 @@ export default function AdminConversationsPage() {
         <section className="grid gap-6 xl:grid-cols-2">
           <Card className="cg-panel rounded-[2rem] border-0">
             <CardHeader>
-              <CardTitle className="text-2xl text-[#0f2e2c]">Recent AI activity</CardTitle>
+              <CardTitle className="text-2xl text-[#0f2e2c]">Recent support activity</CardTitle>
               <CardDescription>Latest caregiver conversations currently being persisted inside the portal.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -358,7 +358,7 @@ export default function AdminConversationsPage() {
           <Card className="cg-panel rounded-[2rem] border-0">
             <CardHeader>
               <CardTitle className="text-2xl text-[#0f2e2c]">Recent voice outcomes</CardTitle>
-              <CardDescription>Latest synced or pending call records captured from ElevenLabs conversations.</CardDescription>
+              <CardDescription>Latest synced or pending call records captured from Wibiz support conversations.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {overview.data?.recentCalls.map(({ call, user: caregiver }) => (

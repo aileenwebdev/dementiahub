@@ -37,15 +37,15 @@ export default function AssistantPage() {
 
   const sidebar = (
     <div className="cg-sidebar-card sticky top-[104px] rounded-[1.6rem] p-6">
-      <p className="mb-4 text-[11px] uppercase tracking-[0.18em] text-white/32">Recognized User</p>
+      <p className="mb-4 text-[11px] uppercase tracking-[0.18em] text-white/32">Caregiver Profile</p>
       <div className="rounded-[1.25rem] border border-white/10 bg-white/6 p-5">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#7a9e8a]/18">
             <UserRound className="h-4 w-4 text-[#edb27e]" />
           </div>
           <div>
-            <p className="text-sm text-white/45">Portal user ID</p>
-            <p className="text-lg font-medium text-white">{data?.conversation.portalUserId ?? "Loading..."}</p>
+            <p className="text-sm text-white/45">Portal profile</p>
+            <p className="text-lg font-medium text-white">{data?.conversation.portalUserId ? "Recognized" : "Loading..."}</p>
           </div>
         </div>
 
@@ -54,7 +54,7 @@ export default function AssistantPage() {
             <p className="text-white/36">Wibiz contact</p>
             <div className="mt-1">
               {identity?.ghlContactId ? (
-                <Badge className="bg-[#d4935a]/18 text-[#edb27e] hover:bg-[#d4935a]/18">{identity.ghlContactId}</Badge>
+                <Badge className="bg-[#d4935a]/18 text-[#edb27e] hover:bg-[#d4935a]/18">Linked</Badge>
               ) : (
                 <Badge variant="outline" className="border-white/14 text-white/68">Not linked yet</Badge>
               )}
@@ -76,25 +76,19 @@ export default function AssistantPage() {
         The assistant uses the logged-in caregiver profile from this portal session and reloads saved history each time the same user comes back.
       </div>
 
-      <p className="mb-4 mt-6 text-[11px] uppercase tracking-[0.18em] text-white/32">Case Triage</p>
+      <p className="mb-4 mt-6 text-[11px] uppercase tracking-[0.18em] text-white/32">Support Status</p>
       <div className="rounded-[1.25rem] border border-white/10 bg-white/6 p-5 text-sm leading-6 text-white/68">
         <div className="flex items-center justify-between">
-          <span>Safety</span>
-          <Badge className="bg-[#7a9e8a]/18 text-[#edb27e] hover:bg-[#7a9e8a]/18">
-            {data?.conversation.safetyResult ?? "Pending"}
-          </Badge>
+          <span>Conversation</span>
+          <Badge className="bg-[#7a9e8a]/18 text-[#edb27e] hover:bg-[#7a9e8a]/18">Saved</Badge>
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <span>Topic</span>
-          <span className="text-white/84">{data?.conversation.topicClassified ?? "general"}</span>
+          <span>Wibiz support</span>
+          <span className="text-white/84">{data?.conversation.ghlSynced ? "Synced" : "Ready"}</span>
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <span>Wibiz Sync</span>
-          <span className="text-white/84">{data?.conversation.ghlSynced ? "Synced" : "Pending"}</span>
-        </div>
-        <div className="mt-3 flex items-center justify-between">
-          <span>Human takeover</span>
-          <span className="text-white/84">{data?.conversation.humanTakeover ? "Active" : "AI handling"}</span>
+          <span>Support mode</span>
+          <span className="text-white/84">{data?.conversation.humanTakeover ? "Human support" : "Assistant"}</span>
         </div>
       </div>
     </div>
@@ -111,12 +105,12 @@ export default function AssistantPage() {
                 One caregiver, one continuous conversation.
               </h1>
               <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">
-                This assistant now connects to your live ElevenLabs chat agent while staying anchored to the authenticated portal user, so the experience sounds natural and your saved history remains inside the caregiver portal.
+                This assistant stays anchored to your caregiver profile, so support feels continuous and your saved history remains inside the caregiver portal.
               </p>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[#7a9e8a]/22 bg-[#7a9e8a]/10 px-4 py-2 text-sm font-medium text-[#527a68]">
               <span className="h-2 w-2 rounded-full bg-[#7a9e8a]" />
-              ElevenLabs live chat enabled
+              Support assistant online
             </div>
           </div>
         </section>
@@ -126,7 +120,7 @@ export default function AssistantPage() {
             {
               icon: UserRound,
               title: "Recognized identity",
-              text: "The ElevenLabs agent receives the logged-in caregiver profile before every session starts.",
+              text: "The assistant uses the logged-in caregiver profile before every session starts.",
             },
             {
               icon: MessagesSquare,
@@ -136,7 +130,7 @@ export default function AssistantPage() {
             {
               icon: Shield,
               title: "Auto triage",
-              text: "Chat sessions are classified for safety and escalation so they can flow into your case records too.",
+              text: "When a conversation needs follow-up, it can move into staff support without losing context.",
             },
           ].map((item) => (
             <div key={item.title} className="cg-stat rounded-[1.5rem] p-5">
@@ -157,12 +151,12 @@ export default function AssistantPage() {
               ) : (
                 <Brain className="h-5 w-5 text-[#1d4e4b]" />
               )}
-              {data?.conversation.humanTakeover ? "Human Support Chat" : "ElevenLabs Caregiver Assistant"}
+              {data?.conversation.humanTakeover ? "Human Support Chat" : "Caregiver Support Assistant"}
             </CardTitle>
             <CardDescription>
               {data?.conversation.humanTakeover
                 ? "A staff member has taken over this case. New messages go to the human support team instead of the AI assistant."
-                : "This portal chat now uses the live ElevenLabs agent, while Wibiz remains the backend system of record for caregiver identity, cases, and automation."}
+                : "This portal chat keeps your caregiver identity, conversation history, and Wibiz support record connected."}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">

@@ -8,14 +8,6 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import DashboardLayout from "../components/DashboardLayout";
 
-function SafetyBadge({ result }: { result?: string | null }) {
-  if (!result) return <Badge variant="secondary">Pending</Badge>;
-  if (result === "SAFE") return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Safe</Badge>;
-  if (result === "CAUTION") return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Caution</Badge>;
-  if (result === "UNSAFE") return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Unsafe</Badge>;
-  return <Badge variant="outline">{result}</Badge>;
-}
-
 function StatusIndicator({ ok, label }: { ok: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2 text-sm">
@@ -44,8 +36,11 @@ export default function Home() {
 
   const totalCalls = callHistory?.length ?? 0;
   const completedCalls = callHistory?.filter((c) => c.status === "completed" || c.status === "synced").length ?? 0;
-  const safeCalls = callHistory?.filter((c) => c.safetyResult === "SAFE").length ?? 0;
-  const cautionCalls = callHistory?.filter((c) => c.safetyResult === "CAUTION").length ?? 0;
+  const chatCount = chatHistory?.length ?? 0;
+  const needsFollowUp = [
+    ...(callHistory?.filter((c) => c.callbackRequested || c.escalationTriggered || c.resolutionType === "needs_staff") ?? []),
+    ...(chatHistory?.filter((c) => c.callbackRequested || c.escalationTriggered || c.resolutionType === "needs_staff") ?? []),
+  ].length;
   const callbackPending = callHistory?.filter((c) => c.callbackRequested && c.status !== "synced").length ?? 0;
   const recentConversations = [
     ...(callHistory?.map((call) => ({
@@ -115,14 +110,14 @@ export default function Home() {
                 Hello, {user?.name?.split(" ")[0] ?? "there"}.
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Your assistant, call records, and support pathways live here. The portal now keeps your caregiver identity and AI context together.
+                Your assistant, call records, and support pathways live here. The portal keeps your caregiver identity and support context together.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#7a9e8a]/22 bg-[#7a9e8a]/10 px-4 py-2 text-sm font-medium text-[#527a68]">
                 <span className="h-2 w-2 rounded-full bg-[#7a9e8a]" />
-                AI assistant online
+                Support assistant online
               </div>
               <Button onClick={() => setLocation("/assistant")} className="h-11 rounded-full bg-[#1d4e4b] px-5 hover:bg-[#0f2e2c]">
                 Open Assistant
@@ -174,18 +169,18 @@ export default function Home() {
               href: "/history?channel=call&status=completed",
             },
             {
-              label: "Safe Calls",
-              value: safeCalls,
-              icon: Shield,
+              label: "Chat Threads",
+              value: chatCount,
+              icon: MessageSquare,
               tone: "bg-[#7a9e8a]/14 text-[#527a68]",
-              href: "/history?channel=call&safety=SAFE",
+              href: "/history?channel=chat",
             },
             {
-              label: "Caution",
-              value: cautionCalls,
+              label: "Follow-ups",
+              value: needsFollowUp,
               icon: AlertTriangle,
               tone: "bg-amber-100 text-amber-700",
-              href: "/history?channel=call&safety=CAUTION",
+              href: "/history",
             },
             {
               label: "Callbacks Due",
@@ -278,7 +273,9 @@ export default function Home() {
                         </p>
                       </div>
                     </div>
-                    <SafetyBadge result={item.safetyResult} />
+                    <Badge variant="outline" className="capitalize">
+                      {item.kind === "call" ? "Call" : "Chat"}
+                    </Badge>
                   </button>
                 ))}
               </div>
@@ -326,7 +323,7 @@ export default function Home() {
               </CardHeader>
               <CardContent className="grid gap-3">
                 {[
-                  { label: "Continue assistant chat", action: () => setLocation("/assistant") },
+                  { label: "Continue support chat", action: () => setLocation("/assistant") },
                   { label: "Review profile linkage", action: () => setLocation("/profile") },
                   { label: "Start a new call", action: () => setLocation("/call") },
                   ...(user?.role === "admin"

@@ -20,12 +20,17 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import DashboardLayout from "../components/DashboardLayout";
 
-function SafetyBadge({ result }: { result?: string | null }) {
-  if (!result) return <Badge variant="secondary" className="text-xs">Pending</Badge>;
-  if (result === "SAFE") return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-xs">Safe</Badge>;
-  if (result === "CAUTION") return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-xs">Caution</Badge>;
-  if (result === "UNSAFE") return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 text-xs">Unsafe</Badge>;
-  return <Badge variant="outline" className="text-xs">{result}</Badge>;
+function SupportStatusBadge({ item }: { item: HistoryItem }) {
+  if (item.escalationTriggered || item.resolutionType === "needs_staff") {
+    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-xs">Follow-up</Badge>;
+  }
+  if (item.callbackRequested) {
+    return <Badge className="bg-[#d4935a]/14 text-[#b77642] hover:bg-[#d4935a]/14 text-xs">Callback</Badge>;
+  }
+  if (item.status === "completed" || item.status === "synced" || item.resolutionType === "self_serve") {
+    return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-xs">Completed</Badge>;
+  }
+  return <Badge variant="secondary" className="text-xs">In progress</Badge>;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -60,13 +65,15 @@ type HistoryItem = {
   durationSeconds?: number | null;
   href: string;
   searchTokens: string[];
+  callbackRequested?: boolean | null;
+  escalationTriggered?: boolean | null;
+  resolutionType?: string | null;
 };
 
 export default function CallHistoryPage() {
   const [location, setLocation] = useLocation();
   const searchParams = useMemo(() => new URLSearchParams(window.location.search), [location]);
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
-  const [safetyFilter, setSafetyFilter] = useState(() => searchParams.get("safety") ?? "all");
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") ?? "all");
   const [channelFilter, setChannelFilter] = useState(() => searchParams.get("channel") ?? "all");
 
@@ -91,6 +98,9 @@ export default function CallHistoryPage() {
         durationSeconds: call.callDurationSeconds,
         href: `/call/${call.sessionId}`,
         searchTokens: [call.sessionId, call.topicClassified ?? "", call.callSummary ?? ""],
+        callbackRequested: call.callbackRequested,
+        escalationTriggered: call.escalationTriggered,
+        resolutionType: call.resolutionType,
       })) ?? [];
 
     const chatItems =
@@ -113,6 +123,9 @@ export default function CallHistoryPage() {
           chat.conversationSummary ?? "",
           chat.lastMessagePreview ?? "",
         ],
+        callbackRequested: chat.callbackRequested,
+        escalationTriggered: chat.escalationTriggered,
+        resolutionType: chat.resolutionType,
       })) ?? [];
 
     return [...callItems, ...chatItems].sort(
@@ -125,22 +138,21 @@ export default function CallHistoryPage() {
       const matchesSearch =
         !search ||
         item.searchTokens.some((token) => token.toLowerCase().includes(search.toLowerCase()));
-      const matchesSafety = safetyFilter === "all" || item.safetyResult === safetyFilter;
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "completed"
           ? item.status === "completed" || item.status === "synced"
           : item.status === statusFilter);
       const matchesChannel = channelFilter === "all" || item.kind === channelFilter;
-      return matchesSearch && matchesSafety && matchesStatus && matchesChannel;
+      return matchesSearch && matchesStatus && matchesChannel;
     });
-  }, [history, search, safetyFilter, statusFilter, channelFilter]);
+  }, [history, search, statusFilter, channelFilter]);
 
   const stats = useMemo(() => ({
     total: history.length,
-    safe: history.filter((item) => item.safetyResult === "SAFE").length,
-    caution: history.filter((item) => item.safetyResult === "CAUTION").length,
-    unsafe: history.filter((item) => item.safetyResult === "UNSAFE").length,
+    completed: history.filter((item) => item.status === "completed" || item.status === "synced" || item.resolutionType === "self_serve").length,
+    followUp: history.filter((item) => item.escalationTriggered || item.resolutionType === "needs_staff").length,
+    callbacks: history.filter((item) => item.callbackRequested).length,
     synced: history.filter((item) => item.ghlSynced).length,
   }), [history]);
 
@@ -153,7 +165,7 @@ export default function CallHistoryPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Conversation History</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Calls and chat sessions, with shared safety triage and sync status in one place
+              Calls and chat sessions for your caregiver support record
             </p>
           </div>
           <div className="flex gap-2">
@@ -171,9 +183,9 @@ export default function CallHistoryPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
             { label: "Total", value: stats.total, icon: MessageSquare, color: "text-primary" },
-            { label: "Safe", value: stats.safe, icon: Shield, color: "text-emerald-600" },
-            { label: "Caution", value: stats.caution, icon: Clock, color: "text-amber-600" },
-            { label: "Unsafe", value: stats.unsafe, icon: XCircle, color: "text-red-600" },
+            { label: "Completed", value: stats.completed, icon: Shield, color: "text-emerald-600" },
+            { label: "Follow-up", value: stats.followUp, icon: Clock, color: "text-amber-600" },
+            { label: "Callbacks", value: stats.callbacks, icon: XCircle, color: "text-[#b77642]" },
             { label: "Wibiz Synced", value: stats.synced, icon: CheckCircle2, color: "text-emerald-600" },
           ].map((stat) => (
             <Card key={stat.label}>
@@ -202,17 +214,6 @@ export default function CallHistoryPage() {
                   className="pl-9"
                 />
               </div>
-              <Select value={safetyFilter} onValueChange={setSafetyFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Safety" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Safety</SelectItem>
-                  <SelectItem value="SAFE">Safe</SelectItem>
-                  <SelectItem value="CAUTION">Caution</SelectItem>
-                  <SelectItem value="UNSAFE">Unsafe</SelectItem>
-                </SelectContent>
-              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-44">
                   <SelectValue placeholder="Status" />
@@ -242,7 +243,7 @@ export default function CallHistoryPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">
               {filtered.length} {filtered.length === 1 ? "conversation" : "conversations"}
-              {(search || safetyFilter !== "all" || statusFilter !== "all" || channelFilter !== "all") && " (filtered)"}
+              {(search || statusFilter !== "all" || channelFilter !== "all") && " (filtered)"}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -266,7 +267,7 @@ export default function CallHistoryPage() {
                       <TableHead className="w-[160px]">Date</TableHead>
                       <TableHead className="w-[110px]">Channel</TableHead>
                       <TableHead className="w-[320px] min-w-[320px]">Topic</TableHead>
-                      <TableHead className={`w-[110px] ${stickyColumnClass.safety}`}>Safety</TableHead>
+                      <TableHead className={`w-[110px] ${stickyColumnClass.safety}`}>Support</TableHead>
                       <TableHead className={`w-[110px] ${stickyColumnClass.status}`}>Status</TableHead>
                       <TableHead className="w-[95px]">Duration</TableHead>
                       <TableHead className={`w-[90px] ${stickyColumnClass.sync}`}>Wibiz Sync</TableHead>
@@ -315,7 +316,7 @@ export default function CallHistoryPage() {
                           ) : null}
                         </TableCell>
                         <TableCell className={stickyColumnClass.safety}>
-                          <SafetyBadge result={item.safetyResult} />
+                          <SupportStatusBadge item={item} />
                         </TableCell>
                         <TableCell className={stickyColumnClass.status}>
                           <StatusBadge status={item.status} />

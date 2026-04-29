@@ -64,6 +64,14 @@ function SafetyBadge({ result }: { result?: string | null }) {
   return <Badge variant="outline">{result}</Badge>;
 }
 
+function SupportBadge({ escalated, callbackRequested, status }: { escalated?: boolean | null; callbackRequested?: boolean | null; status?: string | null }) {
+  if (escalated) return <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">Follow-up needed</Badge>;
+  if (callbackRequested) return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Callback requested</Badge>;
+  if (status === "closed" || status === "synced") return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Completed</Badge>;
+  if (status === "open") return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">In progress</Badge>;
+  return <Badge variant="secondary">Saved</Badge>;
+}
+
 function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 py-2">
@@ -226,7 +234,11 @@ export default function ChatConversationDetailsPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <SafetyBadge result={conversation.safetyResult} />
+              <SupportBadge
+                escalated={conversation.escalationTriggered}
+                callbackRequested={conversation.callbackRequested}
+                status={conversation.status}
+              />
               {isStaff ? <Badge variant="outline">{formatLabel(conversation.caseStatus)}</Badge> : null}
               {conversation.humanTakeover ? (
                 <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">Human takeover active</Badge>
@@ -388,34 +400,36 @@ export default function ChatConversationDetailsPage() {
           </div>
 
           <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                  <Shield className="h-4 w-4 text-primary" />
-                  Safety Assessment
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-0 divide-y divide-border">
-                <MetaRow label="Result" value={<SafetyBadge result={conversation.safetyResult} />} />
-                {conversation.safetyFlagType && conversation.safetyFlagType !== "none" ? (
-                  <MetaRow label="Flag Type" value={conversation.safetyFlagType} />
-                ) : null}
-                <MetaRow
-                  label="Escalation"
-                  value={
-                    conversation.escalationTriggered ? (
-                      <span className="flex items-center gap-1 text-red-600">
-                        <AlertTriangle className="h-3.5 w-3.5" /> Triggered
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-emerald-600">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> None
-                      </span>
-                    )
-                  }
-                />
-              </CardContent>
-            </Card>
+            {isStaff ? (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                    <Shield className="h-4 w-4 text-primary" />
+                    Internal Review
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0 divide-y divide-border">
+                  <MetaRow label="Result" value={<SafetyBadge result={conversation.safetyResult} />} />
+                  {conversation.safetyFlagType && conversation.safetyFlagType !== "none" ? (
+                    <MetaRow label="Review Type" value={conversation.safetyFlagType} />
+                  ) : null}
+                  <MetaRow
+                    label="Escalation"
+                    value={
+                      conversation.escalationTriggered ? (
+                        <span className="flex items-center gap-1 text-red-600">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Triggered
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-emerald-600">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> None
+                        </span>
+                      )
+                    }
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader className="pb-2">
@@ -653,52 +667,56 @@ export default function ChatConversationDetailsPage() {
               </Card>
             ) : null}
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                  <ExternalLink className="h-4 w-4 text-primary" />
-                  Wibiz Integration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-0 divide-y divide-border">
-                <MetaRow
-                  label="Wibiz Synced"
-                  value={
-                    conversation.ghlSynced ? (
-                      <span className="flex items-center gap-1 text-emerald-600">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Yes
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" /> Pending
-                      </span>
-                    )
-                  }
-                />
-                {conversation.ghlSyncedAt ? (
-                  <MetaRow label="Synced At" value={new Date(conversation.ghlSyncedAt).toLocaleString()} />
-                ) : null}
-                {conversation.ghlSyncError ? (
-                  <div className="pt-2">
-                    <p className="rounded bg-red-50 p-2 text-xs text-red-600">{conversation.ghlSyncError}</p>
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
+            {isStaff ? (
+              <>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                      <ExternalLink className="h-4 w-4 text-primary" />
+                      Wibiz Integration
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-0 divide-y divide-border">
+                    <MetaRow
+                      label="Wibiz Synced"
+                      value={
+                        conversation.ghlSynced ? (
+                          <span className="flex items-center gap-1 text-emerald-600">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Yes
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5" /> Pending
+                          </span>
+                        )
+                      }
+                    />
+                    {conversation.ghlSyncedAt ? (
+                      <MetaRow label="Synced At" value={new Date(conversation.ghlSyncedAt).toLocaleString()} />
+                    ) : null}
+                    {conversation.ghlSyncError ? (
+                      <div className="pt-2">
+                        <p className="rounded bg-red-50 p-2 text-xs text-red-600">{conversation.ghlSyncError}</p>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardContent className="pb-3 pt-4">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Conversation ID</p>
-                <code className="break-all text-xs font-mono">{conversation.id}</code>
-                {conversation.elevenlabsConversationId ? (
-                  <>
-                    <Separator className="my-2" />
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">ElevenLabs ID</p>
-                    <code className="break-all text-xs font-mono">{conversation.elevenlabsConversationId}</code>
-                  </>
-                ) : null}
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardContent className="pb-3 pt-4">
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">Conversation ID</p>
+                    <code className="break-all text-xs font-mono">{conversation.id}</code>
+                    {conversation.elevenlabsConversationId ? (
+                      <>
+                        <Separator className="my-2" />
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">Wibiz Chat ID</p>
+                        <code className="break-all text-xs font-mono">{conversation.elevenlabsConversationId}</code>
+                      </>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </>
+            ) : null}
           </div>
         </div>
       </div>

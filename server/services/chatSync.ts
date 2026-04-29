@@ -64,7 +64,13 @@ export async function syncChatConversationToGHL(params: {
     await addTagsToContact(config.ghlApiKey, ghlContactId, [
       `${tagPrefix}${triage.safetyResult}`,
       `Case Topic - ${topicToCaseCategory(triage.topicClassified)}`,
+      "Wibiz Trigger - Portal Chat",
+      triage.resolutionType === "self_serve"
+        ? "Wibiz Trigger - Self Serve"
+        : "Wibiz Trigger - Needs Staff",
+      ...(triage.escalationTriggered ? ["Wibiz Trigger - Escalation"] : []),
       ...(triage.callbackRequested ? ["Callback Requested"] : []),
+      ...(triage.callbackRequested ? ["Wibiz Trigger - Callback Requested"] : []),
     ]);
 
     const opportunities = await getOpportunitiesForContact(

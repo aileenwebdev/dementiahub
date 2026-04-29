@@ -60,7 +60,7 @@ export default function ProfilePage() {
           { label: "Account created", done: true },
           { label: "Phone number saved", done: setupStatus?.hasPhone ?? false },
           { label: "Wibiz contact linked", done: setupStatus?.hasGHLContact ?? false },
-          { label: "ElevenLabs configured", done: setupStatus?.elevenLabsConfigured ?? false },
+          { label: "Wibiz voice configured", done: setupStatus?.elevenLabsConfigured ?? false },
           { label: "Consent verified", done: setupStatus?.consentGiven ?? false },
         ].map((item) => (
           <div key={item.label} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/6 px-4 py-3">
@@ -173,10 +173,9 @@ export default function ProfilePage() {
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                     <span className="font-medium text-emerald-700">Wibiz contact linked</span>
                   </div>
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-                    <span className="text-muted-foreground">Contact ID</span>
-                    <code className="rounded-full bg-[#ede7dc] px-3 py-1 text-[#0f2e2c]">{identity.ghlContactId}</code>
-                  </div>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                    Your profile is ready for Wibiz support workflows.
+                  </p>
                   {identity.consentGiven && (
                     <div className="mt-3 flex items-center gap-2 text-sm text-emerald-700">
                       <Shield className="h-4 w-4" />
@@ -202,7 +201,7 @@ export default function ProfilePage() {
                     <span className="font-medium text-[#84532d]">No Wibiz contact linked yet</span>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-[#84532d]">
-                    Save a phone number first, then create or re-sync the caregiver contact so future AI and call activity maps back to this same account.
+                    Save a phone number first, then create or re-sync the caregiver contact so future support and call activity maps back to this same account.
                   </p>
                 </div>
                 <Button

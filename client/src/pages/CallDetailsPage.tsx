@@ -66,6 +66,14 @@ function SafetyBadge({ result }: { result?: string | null }) {
   return <Badge variant="outline">{result}</Badge>;
 }
 
+function SupportBadge({ escalated, callbackRequested, status }: { escalated?: boolean | null; callbackRequested?: boolean | null; status?: string | null }) {
+  if (escalated) return <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">Follow-up needed</Badge>;
+  if (callbackRequested) return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Callback requested</Badge>;
+  if (status === "completed" || status === "synced") return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Completed</Badge>;
+  if (status === "active") return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">In progress</Badge>;
+  return <Badge variant="secondary">Saved</Badge>;
+}
+
 function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 py-2">
@@ -212,7 +220,11 @@ export default function CallDetailsPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <SafetyBadge result={session.safetyResult} />
+              <SupportBadge
+                escalated={session.escalationTriggered}
+                callbackRequested={session.callbackRequested}
+                status={session.status}
+              />
               {isStaff ? <Badge variant="outline">{formatLabel(session.caseStatus)}</Badge> : null}
               {session.humanTakeover ? <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">Human owned</Badge> : null}
               {session.status === "active" && (
@@ -296,34 +308,36 @@ export default function CallDetailsPage() {
           </div>
 
           <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-primary" />
-                  Safety Assessment
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-0 divide-y divide-border">
-                <MetaRow label="Result" value={<SafetyBadge result={session.safetyResult} />} />
-                {session.safetyFlagType && session.safetyFlagType !== "none" && (
-                  <MetaRow label="Flag Type" value={session.safetyFlagType} />
-                )}
-                <MetaRow
-                  label="Escalation"
-                  value={
-                    session.escalationTriggered ? (
-                      <span className="text-red-600 flex items-center gap-1">
-                        <AlertTriangle className="h-3.5 w-3.5" /> Triggered
-                      </span>
-                    ) : (
-                      <span className="text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> None
-                      </span>
-                    )
-                  }
-                />
-              </CardContent>
-            </Card>
+            {isStaff ? (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-primary" />
+                    Internal Review
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0 divide-y divide-border">
+                  <MetaRow label="Result" value={<SafetyBadge result={session.safetyResult} />} />
+                  {session.safetyFlagType && session.safetyFlagType !== "none" && (
+                    <MetaRow label="Review Type" value={session.safetyFlagType} />
+                  )}
+                  <MetaRow
+                    label="Escalation"
+                    value={
+                      session.escalationTriggered ? (
+                        <span className="text-red-600 flex items-center gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Triggered
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> None
+                        </span>
+                      )
+                    }
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader className="pb-2">
@@ -539,56 +553,60 @@ export default function CallDetailsPage() {
               </Card>
             ) : null}
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4 text-primary" />
-                  Wibiz Integration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-0 divide-y divide-border">
-                <MetaRow
-                  label="Wibiz Synced"
-                  value={
-                    session.ghlSynced ? (
-                      <span className="text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Yes
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" /> Pending
-                      </span>
-                    )
-                  }
-                />
-                {session.ghlContactId && (
-                  <MetaRow label="Wibiz Contact ID" value={<span className="font-mono text-xs">{session.ghlContactId}</span>} />
-                )}
-                {session.ghlOpportunityId && (
-                  <MetaRow label="Wibiz Opportunity ID" value={<span className="font-mono text-xs">{session.ghlOpportunityId}</span>} />
-                )}
-                {session.ghlSyncedAt && <MetaRow label="Synced At" value={new Date(session.ghlSyncedAt).toLocaleString()} />}
-                {session.ghlSyncError && (
-                  <div className="pt-2">
-                    <p className="text-xs text-red-600 bg-red-50 rounded p-2">{session.ghlSyncError}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {isStaff ? (
+              <>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <ExternalLink className="h-4 w-4 text-primary" />
+                      Wibiz Integration
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-0 divide-y divide-border">
+                    <MetaRow
+                      label="Wibiz Synced"
+                      value={
+                        session.ghlSynced ? (
+                          <span className="text-emerald-600 flex items-center gap-1">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Yes
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" /> Pending
+                          </span>
+                        )
+                      }
+                    />
+                    {session.ghlContactId && (
+                      <MetaRow label="Wibiz Contact ID" value={<span className="font-mono text-xs">{session.ghlContactId}</span>} />
+                    )}
+                    {session.ghlOpportunityId && (
+                      <MetaRow label="Wibiz Opportunity ID" value={<span className="font-mono text-xs">{session.ghlOpportunityId}</span>} />
+                    )}
+                    {session.ghlSyncedAt && <MetaRow label="Synced At" value={new Date(session.ghlSyncedAt).toLocaleString()} />}
+                    {session.ghlSyncError && (
+                      <div className="pt-2">
+                        <p className="text-xs text-red-600 bg-red-50 rounded p-2">{session.ghlSyncError}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardContent className="pt-4 pb-3">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Session ID</p>
-                <code className="text-xs font-mono break-all">{session.sessionId}</code>
-                {session.elevenlabsConversationId && (
-                  <>
-                    <Separator className="my-2" />
-                    <p className="text-xs text-muted-foreground font-medium mb-1">ElevenLabs ID</p>
-                    <code className="text-xs font-mono break-all">{session.elevenlabsConversationId}</code>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground font-medium mb-1">Session ID</p>
+                    <code className="text-xs font-mono break-all">{session.sessionId}</code>
+                    {session.elevenlabsConversationId && (
+                      <>
+                        <Separator className="my-2" />
+                        <p className="text-xs text-muted-foreground font-medium mb-1">Wibiz Voice ID</p>
+                        <code className="text-xs font-mono break-all">{session.elevenlabsConversationId}</code>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : null}
           </div>
         </div>
       </div>
